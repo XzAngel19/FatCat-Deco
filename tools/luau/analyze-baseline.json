@@ -1,0 +1,7 @@
+{
+  "comment": "Known analyzer reports for Cobalt.txt: Luau cannot narrow through IsA(), Enum.* is not a type in the wasm front end, and Cobalt type-checks its own CodeGen.CallInfo against an untyped export root. See docs/LUAU-TOOLCHAIN.md.",
+  "entries": [
+    "Cobalt.txt|1001|Unknown type 'CodeGen.CallInfo'",
+    "Cobalt.txt|1043|the function 'string.format' expects to get a unknown as its 2nd argument, but is being given a string & { read GetComponents: unknown } & { read X: unknown } & { read X: unknown } & { read Y: unknown } & { read Y: unknown } & { read Z: unknown }"
+  ]
+}

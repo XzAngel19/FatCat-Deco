@@ -1,0 +1,27 @@
+{
+  "//": "Heavy obfuscation pass for decompiler OUTPUT. Not for release artifacts:",
+  "//2": "rename_variables + remove_types + compute_expression change what a human",
+  "//3": "reads, so it is opt-in by path and never runs in validate.sh.",
+  "//4": "Consumed by tools/luau/minify.mjs --config tools/luau/darklua.heavy.json",
+  "output": "build/Cobalt.heavy.lua",
+  "rules": [
+    "remove_types",
+    "remove_assertions",
+    "remove_debug_profiling",
+    "remove_nil_declaration",
+    "remove_compound_assignment",
+    "convert_index_to_field",
+    "convert_local_function_to_assign",
+    "group_local_assignment",
+    "remove_empty_do",
+    "remove_unused_if_branch",
+    "remove_unused_while",
+    "remove_unused_variable",
+    "remove_method_definition",
+    "remove_function_call_parens",
+    "compute_expression",
+    "rename_variables",
+    "remove_comments",
+    "remove_spaces"
+  ]
+}

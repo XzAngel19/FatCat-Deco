@@ -1,0 +1,8 @@
+# Luau toolchain: the tarballs in tools/luau/vendor are the source of truth.
+# tools/luau/setup.sh unpacks them into node_modules and writes bin/.
+tools/luau/node_modules/
+tools/luau/bin/
+
+# Build and report output (validate.sh writes here).
+build/
+*.log

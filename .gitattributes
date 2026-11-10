@@ -1,0 +1,7 @@
+# Cobalt.txt is a Windows-authored Luau bundle: LF endings, and never diff it as
+# one giant line.
+*.txt text eol=lf linguist-language=Luau
+*.lua text eol=lf
+*.luau text eol=lf
+*.luauc binary
+*.tgz binary

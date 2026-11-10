@@ -1,0 +1,21 @@
+{
+  "//": "Release pipeline for Cobalt.txt. Consumed by tools/luau/minify.mjs, which",
+  "//2": "fails when this list and RELEASE_RULES drift apart. Rule docs:",
+  "//3": "https://darklua.com/docs/ (seaofvoices/darklua)",
+  "output": "build/Cobalt.min.lua",
+  "rules": [
+    "remove_types",
+    "remove_debug_profiling",
+    "remove_compound_assignment",
+    "convert_local_function_to_assign",
+    "group_local_assignment",
+    "remove_empty_do",
+    "remove_unused_if_branch",
+    "remove_unused_while",
+    "remove_unused_variable",
+    "remove_method_definition",
+    "rename_variables",
+    "remove_comments",
+    "remove_spaces"
+  ]
+}
