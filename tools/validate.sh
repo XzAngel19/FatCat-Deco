@@ -87,6 +87,24 @@ tools/luau/bin/luau-validate build/Cobalt.min.lua >build/minify.validate.log 2>&
 }
 echo "PASS release artifact: minified Cobalt still validates"
 
+# --- Angel Hub -------------------------------------------------------------
+# The menu is the only real Luau program in the tree, so it gets its own gates:
+# it compiles, the analyzer is clean (no baseline entry hides it), and the
+# mocked-DataModel harness passes.
+if [ -f src/AngelHub.lua ]; then
+    "$LUAU_COMPILE" src/AngelHub.lua src/AngelHub.loader.lua >/dev/null
+    node tools/luau/analyze.mjs --quiet src/AngelHub.lua src/AngelHub.loader.lua \
+        >build/angelhub.analyze.txt 2>&1 || {
+        cat build/angelhub.analyze.txt
+        exit 1
+    }
+    bash tools/test_angelhub.sh >build/angelhub.test.log 2>&1 || {
+        tail -20 build/angelhub.test.log
+        exit 1
+    }
+    tail -1 build/angelhub.test.log
+fi
+
 # --- toolchain self-test --------------------------------------------------
 python3 tools/test_luau_toolchain.py
 echo "PASS toolchain self-test"
