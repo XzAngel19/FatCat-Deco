@@ -167,6 +167,10 @@ Bugs reales encontrados y corregidos (cada uno verificado por el harness):
 | 11 | **La librería construía la ventana al cargar** | cualquier cosa que un proyecto añadiera después necesitaba `Hub:Init()`, que tira la ventana y con ella las filas ya puestas. Ahora `Hub:Mount` |
 | 12 | **El loader apuntaba a `main`** | `main` no tiene `src/`: 404 disfrazado de error de sintaxis. Ahora recorre ramas y valida la respuesta |
 | 13 | **El loader partía líneas con `gmatch("[^\n]*\n?")`** | el patrón acepta la cadena vacía → bucle infinito. Ahora `(source .. "\n"):gmatch("(.-)\n")` |
+| 14 | **El hotkey usaba la `window` capturada en el closure** | tras un rebuild esa ventana está muerta y RightShift dejaba de responder. Ahora llama a `Hub:Toggle()`, que resuelve `_window` en el momento |
+| 15 | **Solo `RightShift`** | un teclado de portátil no tiene shift derecho: el menú parecía roto. Ahora `menuKey` acepta una lista |
+| 16 | **`Ctrl+H` exigía `LeftControl`** | con el control derecho no pasaba nada. Ahora cualquiera de los dos, y comparando por `KeyCode.Name` |
+| 17 | **Una tecla consumida por el juego fallaba en silencio** | indistinguible de un hotkey roto. Ahora avisa con un toast |
 
 Los tres últimos salieron del harness nuevo, no del original.
 
@@ -192,13 +196,43 @@ Mejoras visuales:
   la ventana se reacomoda.
 - **`SetAccent`**: recolorea todos los degradados vivos de una.
 
+## Ventanas del decompiler
+
+`src/FatCatHub.project.lua` trae tres pestañas además de `Main`:
+
+| Pestaña | Qué hace | Sin executor completo |
+| --- | --- | --- |
+| **Decompiler** | lista los scripts que el executor deja ver y pide `decompile()` al abrir uno | dice "no disponible" y no rompe |
+| **Executor** | 22 sondas: `decompile`, `getscripts`, `getgc`, `hookfunction`, `gethui`… | lista en "Faltan" lo que no responde |
+| **Hooks** | RemoteSpy sobre `__namecall`, apagado por defecto | avisa y deja el toggle en off |
+
+Una sonda importa más que un `typeof`: `hookfunction` puede existir y reventar
+al llamarla, y para FatCat eso la hace inservible. Cada sonda se prueba en
+`pcall` y el resultado se muestra con punto verde o rojo.
+
+El spy **solo lee**: llama siempre al original y nunca bloquea ni modifica una
+llamada. Se instala únicamente al encender el toggle, nunca al cargar.
+
+## Atajos
+
+| Atajo | Acción |
+| --- | --- |
+| `RightShift` / `LeftShift` | mostrar u ocultar el menú |
+| `Ctrl` (izq. o der.) + `H` | mostrar u ocultar la fila de atajos |
+
+Si el juego se queda con la tecla (chat abierto, un `TextBox` con foco), el menú
+no se abre **y aparece un toast** diciéndolo, en vez de quedarse en silencio.
+Para diagnosticar desde la consola: `_G.FatCatHub._lastKey` y
+`_G.FatCatHub._lastKeyProcessed`.
+
 ## Verificación
 
 ```bash
 bash tools/luau/setup.sh            # toolchain (una vez)
-bash tools/test_fatchub.sh          # 71 asserts de librería + 9 del proyecto
+bash tools/test_fatchub.sh          # 82 asserts de librería + 16 del proyecto
 bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
 bash tools/render_fatchub.sh        # build/FatCatHub.png
+PROJECT=1 bash tools/render_fatchub.sh build/FatCatHub-project.png
 bash tools/validate.sh              # todo lo anterior + el resto del repo
 ```
 

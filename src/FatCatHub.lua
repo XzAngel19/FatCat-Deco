@@ -52,8 +52,10 @@ do
 		cornerRadius = 12,
 		cardRadius = 8,
 		tabs = { "Main" },
-		menuKey = "RightShift",
-		hintsKey = "H",
+		-- Both shifts: a laptop keyboard has no right shift, and a menu that
+		-- only opens with a key you do not have looks like a broken menu.
+		menuKey = { "RightShift", "LeftShift" },
+		hintsKeys = { "H" },
 		saveFolder = "FatCatHub",
 		saveFile = "FatCatHub/config.json",
 		prefsFile = "FatCatHub/preferences.json",
@@ -88,6 +90,9 @@ do
 	-- Gotham renders every glyph at its own optical size; MediumBold keeps
 	-- headings and values the same weight as their row text.
 	local FONT_MEDIUM = Enum.Font.GothamMedium
+	-- Monospace for anything that is code: a proportional face makes column
+	-- alignment in a decompiled listing unreadable.
+	local FONT_MONO = Enum.Font.RobotoMono
 
 	local ANIM = {
 		fast = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -98,7 +103,7 @@ do
 		open = TweenInfo.new(0.36, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	}
 
-	local TEXT_SIZE = { title = 14, tab = 13, label = 13, value = 13, section = 11, hint = 11 }
+	local TEXT_SIZE = { title = 14, tab = 13, label = 13, value = 13, section = 11, hint = 11, code = 11 }
 
 	local UIELEMENT = Enum.RenderPriority.Character.Value + 100
 
@@ -267,6 +272,37 @@ do
 	end
 
 	---Look up a KeyCode by name, nil when the name is unknown.
+	---True when `keyCode` is any of `names` (a string or a list of strings).
+	---Comparing KeyCodes by .Name keeps a typo in the config from silently
+	---killing the hotkey: "RightShift" and Enum.KeyCode.RightShift match.
+	local function matchesKey(keyCode, names)
+		if keyCode == nil or names == nil then
+			return false
+		end
+		if typeof(names) == "string" then
+			return keyCode.Name == names
+		end
+		for _, name in names do
+			if keyCode.Name == name then
+				return true
+			end
+		end
+		return false
+	end
+
+	---Any of the modifiers the hint strip accepts as "ctrl".
+	local function isAnyControlDown()
+		for _, code in { Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl } do
+			local ok, down = pcall(function()
+				return userInputService:IsKeyDown(code)
+			end)
+			if ok and down then
+				return true
+			end
+		end
+		return false
+	end
+
 	local function keyCodeFromName(name)
 		if typeof(name) ~= "string" or name == "" then
 			return nil
@@ -1512,6 +1548,164 @@ do
 		return card
 	end
 
+	---A status row: dot + text, no card, no interaction. Used for the
+	---executor/library readout where a card would look like a button.
+	function Components.Status(parent, text, state)
+		local colors = {
+			on = THEME.positive,
+			off = THEME.negative,
+			warn = THEME.accentAlt,
+			info = colorA,
+		}
+		local dotColor = colors[state or "info"] or colorA
+
+		local row = create("Frame", {
+			Name = tostring(text),
+			Size = UDim2.new(1, 0, 0, 22),
+			BackgroundTransparency = 1,
+			LayoutOrder = parent and parent:GetAttribute("CardCount") or nil,
+		}, parent)
+		if parent then
+			parent:SetAttribute("CardCount", (parent:GetAttribute("CardCount") or 0) + 1)
+		end
+		adoptIntoGroup(row)
+		row:SetAttribute("SearchText", tostring(text))
+
+		local dot = create("Frame", {
+			Size = UDim2.fromOffset(6, 6),
+			Position = UDim2.fromOffset(4, 8),
+			BackgroundColor3 = dotColor,
+			BorderSizePixel = 0,
+		}, row)
+		round(dot, 999)
+
+		create("TextLabel", {
+			Size = UDim2.new(1, -20, 1, 0),
+			Position = UDim2.fromOffset(16, 0),
+			BackgroundTransparency = 1,
+			Text = tostring(text),
+			TextColor3 = THEME.textOff,
+			TextSize = TEXT_SIZE.label,
+			Font = FONT,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+		}, row)
+
+		table.insert(Hub.Searchables, row)
+		return row
+	end
+
+	---Scrolling code block. `lines` is a list of strings; `highlight` is an
+	---optional function(line, index) -> Color3 to tint a line (the script
+	---viewer uses it for matches).
+	function Components.CodeView(parent, options)
+		options = options or {}
+		local lines = options.Lines or {}
+		local height = options.Height or 220
+
+		local holder = create("Frame", {
+			Name = options.Text or "Code",
+			Size = UDim2.new(1, 0, 0, height),
+			BackgroundColor3 = THEME.element,
+			BackgroundTransparency = 0.25,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			LayoutOrder = parent and parent:GetAttribute("CardCount") or nil,
+		}, parent)
+		if parent then
+			parent:SetAttribute("CardCount", (parent:GetAttribute("CardCount") or 0) + 1)
+		end
+		round(holder, CONFIG.cardRadius)
+		create("UIStroke", {
+			Color = THEME.outline,
+			Transparency = 0.7,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}, holder)
+
+		local scroll = create("ScrollingFrame", {
+			Size = UDim2.new(1, -8, 1, -8),
+			Position = UDim2.fromOffset(4, 4),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScrollBarThickness = 3,
+			ScrollBarImageColor3 = THEME.outline,
+			ScrollBarImageTransparency = 0.4,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+		}, holder)
+
+		create("UIListLayout", {
+			Padding = UDim.new(0, 0),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}, scroll)
+		create("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingTop = UDim.new(0, 6) }, scroll)
+
+		local renderLine = function(index, text)
+			local color = THEME.textOff
+			if options.Highlight then
+				local ok, tinted = pcall(options.Highlight, text, index)
+				if ok and typeof(tinted) == "Color3" then
+					color = tinted
+				end
+			end
+			local row = create("TextLabel", {
+				Size = UDim2.new(1, -8, 0, TEXT_SIZE.code + 4),
+				BackgroundTransparency = 1,
+				Text = ("%3d  %s"):format(index, text),
+				TextColor3 = color,
+				TextSize = TEXT_SIZE.code,
+				Font = FONT_MONO,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+			}, scroll)
+			return row
+		end
+
+		local rendered = 0
+		local function append(chunk)
+			for _, line in chunk do
+				rendered += 1
+				renderLine(rendered, line)
+				if options.MaxLines and rendered >= options.MaxLines then
+					return
+				end
+			end
+		end
+
+		append(lines)
+
+		---Replace the whole body. Cheap enough for a few thousand lines and
+		---it keeps the canvas in step with the content.
+		local function setLines(nextLines, nextHighlight)
+			for _, child in scroll:GetChildren() do
+				if child:IsA("TextLabel") then
+					child:Destroy()
+				end
+			end
+			lines = nextLines or {}
+			options.Highlight = nextHighlight or options.Highlight
+			rendered = 0
+			append(lines)
+			holder:SetAttribute("LineCount", rendered)
+		end
+
+		---Append without rebuilding, for streaming logs.
+		local function push(line)
+			rendered += 1
+			renderLine(rendered, line)
+			holder:SetAttribute("LineCount", rendered)
+		end
+
+		holder:SetAttribute("LineCount", rendered)
+		holder.setLines = setLines
+		holder.push = push
+		holder.scroll = scroll
+		holder.SetLines = setLines
+		holder.Push = push
+		return holder
+	end
+
 	---Thin divider.
 	function Components.Divider(parent)
 		local holder = create("Frame", {
@@ -1585,6 +1779,14 @@ do
 
 	---Alias: the row is a colour picker, `Color` reads better on a chain.
 	Section.ColorPicker = Section.Color
+
+	function Section:Status(text, state)
+		return Components.Status(self.frame, text, state)
+	end
+
+	function Section:Code(options)
+		return Components.CodeView(self.frame, options)
+	end
 
 	function Section:Label(text)
 		return Components.Label(self.frame, text)
@@ -1986,8 +2188,8 @@ do
 		window.titleLabel = titleLabel
 
 		local searchBox = create("TextBox", {
-			Size = UDim2.fromOffset(126, 24),
-			Position = UDim2.new(1, -196, 0.5, -12),
+			Size = UDim2.fromOffset(124, 24),
+			Position = UDim2.new(1, -202, 0.5, -12),
 			BackgroundColor3 = THEME.element,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
@@ -2019,15 +2221,17 @@ do
 		---Title bar button.
 		local function titleButton(text, offset, hoverColor)
 			local button = create("TextButton", {
-				Size = UDim2.fromOffset(26, 24),
+				-- 28 wide with a 2px gap between the two, so the pair fills the
+				-- right edge of the bar instead of floating in it.
+				Size = UDim2.fromOffset(28, 24),
 				Position = UDim2.new(1, offset, 0.5, -12),
 				BackgroundColor3 = THEME.element,
 				BackgroundTransparency = 0.35,
 				BorderSizePixel = 0,
 				Text = text,
 				TextColor3 = THEME.textOff,
-				TextSize = 13,
-				Font = FONT_MEDIUM,
+				TextSize = 16,
+				Font = FONT_BOLD,
 				AutoButtonColor = false,
 			}, titleBar)
 			round(button, 6)
@@ -2043,8 +2247,10 @@ do
 			return button
 		end
 
-		local minimizeButton = titleButton("-", -60, THEME.accentAlt)
-		local closeButton = titleButton("x", -34, THEME.negative)
+		-- En dashes and a multiplication sign: a hyphen and the letter x look
+		-- thin and off-centre next to each other at this size.
+		local minimizeButton = titleButton("–", -62, THEME.accentAlt)
+		local closeButton = titleButton("×", -32, THEME.negative)
 
 		-- ------------------------------------------------------------ drag
 		local dragStart, startPosition
@@ -2286,23 +2492,45 @@ do
 				return
 			end
 
-			-- A keybind chip is waiting for the next key.
+			-- Diagnostics first: whatever happens below, the last key the hub
+			-- saw is visible from the console.
+			Hub._lastKey = input.KeyCode
+			Hub._lastKeyProcessed = gameProcessed == true
+			Hub._inputHandler = (Hub._inputHandler or 0) + 1
+
+			-- A keybind chip is waiting for the next key. This runs before the
+			-- gameProcessed check on purpose: while typing a new key into a
+			-- chip, the game is usually eating the keystroke.
 			if Hub._listening then
 				Hub._listening(input.KeyCode)
 				return
 			end
 
 			if gameProcessed then
+				-- Only for the keys we own: the user pressed the menu key and
+				-- Roblox handed the event to the game (a chat box, a TextBox).
+				local wanted = matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey)
+					or (matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown())
+				if wanted and not Hub._processedWarned then
+					Hub._processedWarned = true
+					Hub:Notify(
+						"Key taken by the game",
+						"error",
+						("Press %s with the chat closed"):format(input.KeyCode.Name)
+					)
+				end
 				return
 			end
 
-			if input.KeyCode == keyCodeFromName(CONFIG.hintsKey) and userInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			if matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown() then
 				Hub:SetHintsVisible(not Hub:GetHintsVisible())
 				return
 			end
 
-			if input.KeyCode == keyCodeFromName(Hub.menuKey or CONFIG.menuKey) then
-				window:Toggle()
+			if matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey) then
+				-- Go through Hub:Toggle() rather than the closed-over window: a
+				-- rebuild replaces Hub._window, and the old frame would be dead.
+				Hub:Toggle()
 				return
 			end
 
@@ -2343,7 +2571,9 @@ do
 			return
 		end
 		if #parts == 0 then
-			label.Text = string.format("%s to toggle  |  ctrl+%s for hints", Hub.menuKey or CONFIG.menuKey, CONFIG.hintsKey)
+			local key = Hub.menuKey or CONFIG.menuKey
+			local name = type(key) == "table" and (key[1] or "RightShift") or tostring(key)
+			label.Text = string.format("%s to toggle  |  ctrl+%s for hints", name, CONFIG.hintsKeys[1])
 		else
 			label.Text = table.concat(parts, "   |   ")
 		end

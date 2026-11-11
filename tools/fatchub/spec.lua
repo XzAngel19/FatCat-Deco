@@ -294,6 +294,61 @@ Hub._builders = {}
 Hub:Init(Hub._initOptions)
 check("cleared builders do not run", mountedRuns == 2, mountedRuns)
 
+-- ==========================================================================
+-- Hotkeys: the menu key and the hint strip
+--
+-- These are the two bindings a user notices first, and the ones a closed-over
+-- window or a wrong key name silently breaks.
+-- ==========================================================================
+
+local userInput = game:GetService("UserInputService")
+Hub._listening = nil
+local frame = Hub._window.frame
+frame.Visible = true
+
+-- RightShift, as configured.
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+check("right shift closes the window", frame.Visible == false)
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+check("right shift opens it again", frame.Visible == true)
+
+-- LeftShift too: laptops have no right shift.
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.LeftShift }, false)
+check("left shift also toggles", frame.Visible == false)
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.LeftShift }, false)
+
+-- A key the game already consumed must not toggle the menu.
+local beforeProcessed = frame.Visible
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, true)
+check("game-consumed key does not toggle", frame.Visible == beforeProcessed)
+
+-- Ctrl+H toggles the hint strip; H alone must not.
+local hints = Hub._window.hints
+check("hints start visible", hints.Visible == true)
+
+-- H on its own must not touch the strip.
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.H }, false)
+check("plain H does nothing", hints.Visible == true)
+
+-- Ctrl+H toggles it, both control keys.
+for _, control in { Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl } do
+	local label = control.Name == "LeftControl" and "left ctrl" or "right ctrl"
+	userInput._downKeys[control] = true
+	userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.H }, false)
+	check(label .. "+H hides the hints", hints.Visible == false, tostring(hints.Visible))
+	userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.H }, false)
+	check(label .. "+H shows them again", hints.Visible == true, tostring(hints.Visible))
+	userInput._downKeys[control] = nil
+end
+
+-- After a rebuild the hotkey still has a live window to toggle.
+Hub:Init(Hub._initOptions)
+local rebuiltFrame = Hub._window.frame
+rebuiltFrame.Visible = true
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+check("hotkey works after a rebuild", rebuiltFrame.Visible == false)
+userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+
 Hub:Destroy()
 check("destroy removes the screen", Hub._screen.Parent == nil)
 check("destroy clears _G", _G.FatCatHub == nil)

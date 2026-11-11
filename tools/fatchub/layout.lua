@@ -89,6 +89,10 @@ end
 
 local root = { rect = { x = 0, y = 0, w = VIEWPORT.width, h = VIEWPORT.height }, children = {} }
 
+-- Instance -> measured rect, filled by measure() so the flat emission can walk
+-- back up to the clip ancestors.
+local rects = {}
+
 ---Pass 1: resolve rects into a tree of nodes.
 local function measure(parent, rect, node)
 	local padding = childOfClass(parent, "UIPadding")
@@ -146,6 +150,7 @@ local function measure(parent, rect, node)
 
 			-- Children first: an AutomaticSize.Y box needs their extent before
 			-- its own height is known.
+			rects[child] = childRect
 			measure(child, childRect, childNode)
 
 			if childNode.automatic then
@@ -243,6 +248,21 @@ local function flatten(node)
 				table.insert(parts, string.format('"color":[%s,%s,%s]',
 					colorToTable(instance.TextColor3)[1], colorToTable(instance.TextColor3)[2],
 					colorToTable(instance.TextColor3)[3]))
+			end
+			-- Clip chain: every ancestor that hides overflow. The renderer has a
+			-- flat list, so the rects are intersected at draw time.
+			local clips = {}
+			local parent = instance.Parent
+			while parent and parent ~= screen and #clips < 8 do
+				local rect = rects[parent]
+				if rect and (parent.ClipsDescendants or parent.ClassName == "ScrollingFrame") then
+					table.insert(clips, string.format("[%s,%s,%s,%s]",
+						math.floor(rect.x), math.floor(rect.y), math.floor(rect.w), math.floor(rect.h)))
+				end
+				parent = parent.Parent
+			end
+			if #clips > 0 then
+				table.insert(parts, '"clip":[' .. table.concat(clips, ",") .. "]")
 			end
 			print("{" .. table.concat(parts, ",") .. "}")
 			emitted += 1

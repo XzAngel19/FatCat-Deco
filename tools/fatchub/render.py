@@ -106,12 +106,33 @@ def main() -> int:
         alpha = 0.01 + index * 0.0004
         canvas.rect(0, 0, WIDTH, HEIGHT, (0.35, 0.4, 0.55), alpha, 0)
 
+    def clipped(node: dict) -> dict | None:
+        """Intersect a node with every ClipsDescendants ancestor."""
+        x, y = node["x"], node["y"]
+        w, h = node["w"], node["h"]
+        for cx, cy, cw, ch in node.get("clip") or []:
+            left = max(x, cx)
+            top = max(y, cy)
+            right = min(x + w, cx + cw)
+            bottom = min(y + h, cy + ch)
+            x, y, w, h = left, top, right - left, bottom - top
+            if w <= 0 or h <= 0:
+                return None
+        if (x, y, w, h) == (node["x"], node["y"], node["w"], node["h"]):
+            return node
+        cut = dict(node)
+        cut.update(x=x, y=y, w=w, h=h)
+        return cut
+
     for node in nodes:
         if not node.get("fill"):
             continue
         transparency = node.get("transparency") or 0
         alpha = max(0.0, 1.0 - transparency)
         if node.get("w", 0) <= 0 or node.get("h", 0) <= 0:
+            continue
+        node = clipped(node)
+        if node is None:
             continue
         fill = node.get("fill") or [1, 1, 1]
         # A gradient's own Transparency sequence modulates the fill; without
@@ -128,6 +149,9 @@ def main() -> int:
 
     for node in nodes:
         if not node.get("text"):
+            continue
+        node = clipped(node)
+        if node is None:
             continue
         color = node.get("color") or [1, 1, 1]
         size = node.get("size", 12)

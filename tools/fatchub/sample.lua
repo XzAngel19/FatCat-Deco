@@ -3,6 +3,34 @@
 local Hub = _G.FatCatHub
 local page = Hub._window:Tab("Main")
 
+-- The project tabs, when the renderer is asked for them. They are mounted by
+-- src/FatCatHub.project.lua, which the render script loads when present.
+for _, name in { "Decompiler", "Executor", "Hooks" } do
+	local existing = Hub._window.pages[name]
+	if existing and not Hub._window.selected then
+		Hub._window:SelectTab(name)
+	end
+end
+if Hub._window.selected == "Decompiler" then
+	local box = Hub._window.pages["Decompiler"]:Section("Scripts", 1)
+	box:Status("decompile: no disponible", "off")
+	box:Divider()
+	box:Label("0 script(s) visibles")
+	local code = Hub._window.pages["Decompiler"]:Section("Source", 2)
+	code:Code({
+		Lines = {
+			"-- Selecciona un script de la izquierda.",
+			"",
+			"-- Este executor no expone decompile().",
+			'local function ejemplo()',
+			'    return "hola"',
+			"end",
+		},
+		Height = 300,
+	})
+	_G.__SAMPLE_DONE = true
+end
+
 local left = page:Section("Toggles")
 left:Toggle({ Text = "Auto Protect", Flag = "autoProtect", Default = true })
 left:Toggle({ Text = "Silent Aim", Flag = "silentAim", Description = "Uses the camera ray" })

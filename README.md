@@ -10,7 +10,7 @@ menú **FatCat Hub**.
 bash tools/luau/setup.sh --verify   # toolchain Luau desde los tarballs vendorizados
 bash tools/validate.sh              # puerta completa del toolchain
 bash tools/validate.sh --quick      # sin el type checker
-bash tools/test_fatchub.sh          # 71 + 9 asserts sobre el menú (Roblox simulado)
+bash tools/test_fatchub.sh          # 82 + 16 asserts sobre el menú (Roblox simulado)
 bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
 bash tools/render_fatchub.sh        # build/FatCatHub.png
 ```
@@ -18,11 +18,11 @@ bash tools/render_fatchub.sh        # build/FatCatHub.png
 Solo necesita `node` (v22) y `python3`. No hay `npm install` ni descargas: todo
 está vendorizado en `tools/luau/vendor/`.
 
-## FatCat Hub (menú vacío)
+## FatCat Hub (menú del decompiler)
 
 ```
 src/FatCatHub.lua          el menú: shell, componentes, API
-src/FatCatHub.project.lua  lo que el juego rellena (vacío por ahora)
+src/FatCatHub.project.lua  las ventanas: Decompiler, Executor, Hooks
 src/FatCatHub.loader.lua   loader de una línea
 docs/FATCAT-HUB.md         API, componentes y lista de bugs corregidos
 ```

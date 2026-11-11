@@ -66,13 +66,19 @@ Enum = {
 		Gotham = { Name = "Gotham", Value = 1 },
 		GothamBold = { Name = "GothamBold", Value = 2 },
 		GothamMedium = { Name = "GothamMedium", Value = 3 },
+		RobotoMono = { Name = "RobotoMono", Value = 6 },
+		Code = { Name = "Code", Value = 7 },
 		SourceSans = { Name = "SourceSans", Value = 4 },
 		SourceSansBold = { Name = "SourceSansBold", Value = 5 },
 	},
+	-- Every letter is here: a harness that silently drops Enum.KeyCode.H turns
+	-- a working hotkey into a failing test.
 	KeyCode = makeEnum("KeyCode", {
-		"Unknown", "Escape", "RightShift", "LeftShift", "Insert", "Delete", "End", "Home",
-		"F1", "F2", "Q", "E", "R", "T", "Y", "U", "I", "O", "P", "A", "S", "D", "F",
-		"LeftControl", "RightControl", "Space", "LeftAlt",
+		"Unknown", "Escape", "Tab", "RightShift", "LeftShift", "Insert", "Delete", "End", "Home",
+		"PageUp", "PageDown", "F1", "F2", "F3",
+		"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+		"Zero", "One", "Two", "Three", "Four",
+		"LeftControl", "RightControl", "LeftAlt", "RightAlt", "Space",
 	}),
 	UserInputType = makeEnum("UserInputType", { "MouseButton1", "MouseMovement", "Touch", "Keyboard" }),
 	EasingStyle = makeEnum("EasingStyle", { "Linear", "Quad", "Quint", "Sine", "Back" }),
@@ -497,8 +503,10 @@ local function makeService(name, extra)
 	for key, value in extra or {} do
 		service[key] = value
 	end
-	function service:IsKeyDown()
-		return false
+	-- Real IsKeyDown so the harness can hold a modifier while firing a key.
+	service._downKeys = {}
+	function service:IsKeyDown(keyCode)
+		return service._downKeys[keyCode] == true
 	end
 	return service
 end

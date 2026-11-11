@@ -2,6 +2,7 @@
 # Render the built shell to a PNG so it can be inspected without Roblox.
 #
 #   bash tools/render_fatchub.sh            # -> build/FatCatHub.png
+#   PROJECT=1 bash tools/render_fatchub.sh  # the decompiler tabs instead
 #
 # Mock + hub + sample rows + layout dump, then tools/fatchub/render.py draws
 # the reported rects. Text is drawn as a placeholder bar (no font metrics), so
@@ -23,6 +24,13 @@ out=build/render_fatchub.lua
     echo
     cat src/FatCatHub.lua
     echo
+    # PROJECT=1 renders the decompiler tabs instead of the sample rows.
+    if [ "${PROJECT:-0}" = "1" ]; then
+        cat src/FatCatHub.project.lua
+        echo
+        echo 'Hub:SelectTab("Decompiler")'
+        echo
+    fi
     cat tools/fatchub/sample.lua
     echo
     cat tools/fatchub/layout.lua
