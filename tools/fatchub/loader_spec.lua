@@ -74,7 +74,7 @@ URLS = {}
 LOGS = {}
 _G.FatCatHubBranch = "some/other-branch"
 pcall(runLoader)
-check(#URLS <= 2, "honoured _G.FatCatHubBranch")
+check(#URLS == 4, "honoured _G.FatCatHubBranch: one branch, two URLs, two forms")
 check(URLS[1] ~= nil and URLS[1]:find("some/other%-branch") ~= nil, "used the branch it was told to")
 _G.FatCatHubBranch = nil
 

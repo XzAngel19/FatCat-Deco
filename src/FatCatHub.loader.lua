@@ -30,8 +30,14 @@ local function branchList()
 	return BRANCHES
 end
 
-local function urlFor(branch)
-	return ("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/%s/src/FatCatHub.lua"):format(branch)
+-- Two URL shapes per branch: raw.githubusercontent, and github.com/.../raw,
+-- which redirects to the same file. The second one exists because a branch name
+-- with a slash in it can be mis-split by the raw host.
+local function urlsFor(branch)
+	return {
+		("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/%s/src/FatCatHub.lua"):format(branch),
+		("https://github.com/XzAngel19/FatCat-Deco/raw/%s/src/FatCatHub.lua"):format(branch),
+	}
 end
 
 local function verbose(...)
@@ -69,31 +75,32 @@ local function download()
 	local tried = {}
 
 	for _, branch in branchList() do
-		local url = urlFor(branch)
 		tried[#tried + 1] = branch
 
-		local calls = {
-			function()
-				return game:HttpGet(url, true)
-			end,
-			function()
-				return game:HttpGet(url)
-			end,
-		}
+		for _, url in urlsFor(branch) do
+			local calls = {
+				function()
+					return game:HttpGet(url, true)
+				end,
+				function()
+					return game:HttpGet(url)
+				end,
+			}
 
-		for _, fetch in calls do
-			local ok, body = pcall(fetch)
-			if ok then
-				local valid, why = looksLikeSource(body)
-				if valid then
-					verbose("loaded from branch", branch)
-					return body, nil, branch
+			for _, fetch in calls do
+				local ok, body = pcall(fetch)
+				if ok then
+					local valid, why = looksLikeSource(body)
+					if valid then
+						verbose("loaded from branch", branch)
+						return body, nil, branch
+					end
+					lastError = why
+					verbose(url .. ": " .. why)
+				else
+					lastError = tostring(body)
+					verbose(url .. ": HttpGet failed: " .. lastError)
 				end
-				lastError = why
-				verbose(branch .. ": " .. why)
-			else
-				lastError = tostring(body)
-				verbose(branch .. ": HttpGet failed: " .. lastError)
 			end
 		end
 	end

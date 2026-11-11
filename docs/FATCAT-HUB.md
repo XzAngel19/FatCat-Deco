@@ -8,8 +8,9 @@ Las pestañas están vacías a propósito: **el menú no registra ningún módul
 
 ```
 src/FatCatHub.lua          el menú completo (shell + componentes + API)
+src/FatCatHub.project.lua  lo que el juego rellena (vacío por ahora)
 src/FatCatHub.loader.lua   loader de una línea
-tools/fatchub/           harness: mock de Roblox, asserts, render PNG
+tools/fatchub/             harness: mock de Roblox, asserts, render PNG
 docs/FATCAT-HUB.md         esto
 ```
 
@@ -19,16 +20,55 @@ docs/FATCAT-HUB.md         esto
 loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/FatCatHub.loader.lua"))()
 ```
 
-El loader baja `src/FatCatHub.lua`, lo compila (con el número de línea exacto si
-hay error de sintaxis), lo ejecuta y devuelve `_G.FatCatHub`. Para cerrarlo:
+Ojo con la URL: **`main` todavía no tiene `src/`**, así que ese archivo solo
+existe en la rama de trabajo. Mientras no esté mergeado:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/4918f801-fatcat-deco/src/FatCatHub.loader.lua"))()
+```
+
+El loader, una vez que corre, resuelve el resto solo: prueba `main` primero y
+luego la rama de trabajo, y se queda con la primera respuesta que de verdad
+parezca la librería. Si el menú acaba en otra rama:
+
+```lua
+_G.FatCatHubBranch = "mi/rama"
+loadstring(...)()
+```
+
+Qué hace, en orden: baja `src/FatCatHub.lua`, lo compila (con la línea exacta y
+dos de contexto si hay error de sintaxis), lo ejecuta y devuelve `_G.FatCatHub`.
+Rechaza páginas HTML, cuerpos truncados y archivos que no son la librería antes
+de intentar compilar nada. Para cerrarlo:
 
 ```lua
 getgenv().FatCatHubUnload()
 ```
 
+Diagnóstico etapa por etapa: `_G.FatCatHubVerbose = true`.
+
 También funciona pegado directo en el executor, sin loader.
 
 ## Llenar el menú
+
+Todo va dentro de `Hub:Mount`, que corre **después** de que la ventana exista:
+
+```lua
+local Hub = _G.FatCatHub
+
+Hub:Mount(function(hub, window)
+    local Combat = window:AddTab("Combat")
+    local box = Combat:Section("Aim")
+    box:Toggle({ Text = "Silent Aim", Flag = "silentAim" })
+end)
+```
+
+`Hub:Init()` construye la ventana y borra lo que hubiera dentro; `Hub:Mount()`
+añade sin tirar nada y **se vuelve a ejecutar** en cada rebuild, así que el
+contenido del juego sobrevive a un cambio de resolución o de pestañas.
+`Hub.deferBoot = true` antes de que cargue la librería retrasa la ventana.
+
+### Referencia de componentes
 
 ```lua
 local Hub = _G.FatCatHub
@@ -124,6 +164,11 @@ Bugs reales encontrados y corregidos (cada uno verificado por el harness):
 | 8 | La fila de atajos se dibujaba encima del contenido | tapaba la última fila de cada pestaña |
 | 9 | `Window:Toggle` y `Hub:Toggle` no existían con el nombre que usa el loader | `attempt to call missing method 'Toggle'` |
 | 10 | El chip de keybind era invisible (`element` + hairline) | no se veía dónde hacer clic para rebindear |
+| 11 | **La librería construía la ventana al cargar** | cualquier cosa que un proyecto añadiera después necesitaba `Hub:Init()`, que tira la ventana y con ella las filas ya puestas. Ahora `Hub:Mount` |
+| 12 | **El loader apuntaba a `main`** | `main` no tiene `src/`: 404 disfrazado de error de sintaxis. Ahora recorre ramas y valida la respuesta |
+| 13 | **El loader partía líneas con `gmatch("[^\n]*\n?")`** | el patrón acepta la cadena vacía → bucle infinito. Ahora `(source .. "\n"):gmatch("(.-)\n")` |
+
+Los tres últimos salieron del harness nuevo, no del original.
 
 Mejoras visuales:
 
@@ -150,9 +195,11 @@ Mejoras visuales:
 ## Verificación
 
 ```bash
-bash tools/luau/setup.sh          # toolchain (una vez)
-bash tools/test_fatchub.sh       # 63 asserts sobre Roblox simulado
-bash tools/render_fatchub.sh     # build/FatCatHub.png
+bash tools/luau/setup.sh            # toolchain (una vez)
+bash tools/test_fatchub.sh          # 71 asserts de librería + 9 del proyecto
+bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
+bash tools/render_fatchub.sh        # build/FatCatHub.png
+bash tools/validate.sh              # todo lo anterior + el resto del repo
 ```
 
 `tools/fatchub/mock.lua` simula el DataModel: instancias, señales, tweens
@@ -166,6 +213,12 @@ todo.
 `UIListLayout`, `UIPadding`, `AutomaticSize`) y `tools/fatchub/render.py` lo
 dibuja a PNG en stdlib puro. El texto sale como barra proporcional: el render
 prueba geometría, apilado, color y recorte, **no** las letras.
+
+El harness del loader no usa red: simula `game:HttpGet`, `loadstring`, `getgenv`,
+`print` y `warn`, y le pasa como respuesta una página HTML, un cuerpo truncado,
+un archivo que no es la librería, una librería con error de sintaxis, un
+`HttpGet` que lanza, y el caso bueno. Comprueba además que cae a la rama
+siguiente y que `_G.FatCatHubBranch` manda.
 
 Prueba que no se puede hacer acá: el menú en Roblox vivo. El VM es el Luau real,
 pero la fuente, los textos y el render final los pone el cliente.
