@@ -1,6 +1,6 @@
--- Angel Hub | library, loader and UI builder.
--- Derived from Angel Hub (KaliHub shell): the game-specific code is gone, the
--- shell is rebuilt. Exposes _G.AngelHub for loader scripts and game modules.
+-- FatCat Hub | library, loader and UI builder.
+-- Derived from the FatCat Hub menu (KaliHub shell): the game-specific code is gone, the
+-- shell is rebuilt. Exposes _G.FatCatHub for loader scripts and game modules.
 --
 --   local Hub = loadstring(game:HttpGet("<url>"))()
 --   local Window = Hub:Window({ Title = "My Hub", Tabs = { "Main" } })
@@ -17,9 +17,9 @@
 --   window                        frame, title bar, tab bar, pages, resize
 --   loader                        boot, xpcall diagnostics
 
-if _G.AngelHub then
+if _G.FatCatHub then
 	pcall(function()
-		_G.AngelHub:Destroy()
+		_G.FatCatHub:Destroy()
 	end)
 end
 
@@ -38,7 +38,7 @@ do
 	-- Config
 	-- ======================================================================
 	local CONFIG = {
-		title = "Angel Hub",
+		title = "FatCat Hub",
 		version = "1.0.0",
 		width = 460,
 		height = 560,
@@ -54,9 +54,9 @@ do
 		tabs = { "Main" },
 		menuKey = "RightShift",
 		hintsKey = "H",
-		saveFolder = "AngelHub",
-		saveFile = "AngelHub/config.json",
-		prefsFile = "AngelHub/preferences.json",
+		saveFolder = "FatCatHub",
+		saveFile = "FatCatHub/config.json",
+		prefsFile = "FatCatHub/preferences.json",
 	}
 
 	local THEME = {
@@ -254,8 +254,10 @@ do
 	-- ======================================================================
 	Hub._initOptions = { Title = CONFIG.title, Tabs = CONFIG.tabs }
 	Hub._currentGroup = nil
+	Hub._builders = {}
+	Hub.deferBoot = false
 
-	_G.AngelHub = Hub
+	_G.FatCatHub = Hub
 
 	---Track a global connection so Destroy can close it.
 	local function connect(signal, callback)
@@ -444,7 +446,7 @@ do
 		return true
 	end
 
-	---Older name kept so game modules written for Angel Hub do not break.
+	---Older name kept so game modules written for FatCat Hub do not break.
 	Hub.notify = function(title, enabled)
 		Hub:Notify(title, enabled and "on" or "off")
 	end
@@ -1846,7 +1848,7 @@ do
 		end
 
 		local screen = create("ScreenGui", {
-			Name = "AngelHub",
+			Name = "FatCatHub",
 			ResetOnSpawn = false,
 			IgnoreGuiInset = true,
 			DisplayOrder = UIELEMENT,
@@ -1862,8 +1864,8 @@ do
 				end)
 			end
 			table.clear(Hub.Connections)
-			if _G.AngelHub == Hub then
-				_G.AngelHub = nil
+			if _G.FatCatHub == Hub then
+				_G.FatCatHub = nil
 			end
 		end)
 
@@ -2384,6 +2386,30 @@ do
 		table.clear(Hub._entries)
 
 		buildWindow()
+
+		-- Builders run against the fresh window, in the order they were added,
+		-- so a mounted module survives a rebuild.
+		for _, builder in Hub._builders do
+			local ok, builderError = pcall(builder, Hub, Hub._window)
+			if not ok then
+				warn("[FatCat Hub] a mounted builder failed: " .. tostring(builderError))
+			end
+		end
+
+		if Hub._window then
+			local first = Hub._window.tabNames[1]
+			if first and not Hub._window.selected then
+				Hub._window:SelectTab(first)
+			end
+		end
+		return Hub
+	end
+
+	---Build the window only once, on demand.
+	function Hub:EnsureBuilt()
+		if not Hub._window then
+			Hub:Init(Hub._initOptions)
+		end
 		return Hub
 	end
 
@@ -2393,8 +2419,8 @@ do
 			Hub._screen:Destroy()
 		end
 		table.clear(Hub.Connections)
-		if _G.AngelHub == Hub then
-			_G.AngelHub = nil
+		if _G.FatCatHub == Hub then
+			_G.FatCatHub = nil
 		end
 	end
 
@@ -2463,13 +2489,55 @@ do
 		return true
 	end
 
-	---Build the window. `Hub:Init()` stays available for parity with the
-	---original Angel Hub loader, which ran the GUI as one block and the
-	---features as a second block reading shared.KaliHub.
-	Hub.Init(Hub._initOptions)
+	---Register a builder that runs against the window once it exists.
+	---Building the GUI immediately would make the library useless as a base:
+	---anything added afterwards would need its own Hub:Init() call, which
+	---throws the current window away.
+	---
+	---   Hub:Mount(function(hub, window)
+	---       local page = window:Tab("Main")
+	---       page:Section("Options"):Toggle({ Text = "Feature", Flag = "feature" })
+	---   end)
+	function Hub:Mount(builder)
+		if type(builder) ~= "function" then
+			return Hub
+		end
+		table.insert(Hub._builders, builder)
+		Hub:EnsureBuilt()
+		if Hub._window then
+			local ok, builderError = pcall(builder, Hub, Hub._window)
+			if not ok then
+				warn("[FatCat Hub] a mounted builder failed: " .. tostring(builderError))
+			end
+		end
+		return Hub
+	end
+
+	---Forget every mounted builder and drop the window.
+	function Hub:ClearBuilders()
+		table.clear(Hub._builders)
+		table.clear((Hub.Values))
+		table.clear((Hub.Defaults))
+		table.clear((Hub.Setters))
+		table.clear((Hub.Keybinds))
+		table.clear(Hub.Searchables)
+		table.clear(Hub._entries)
+		if Hub._window then
+			Hub._window:AddTab(CONFIG.tabs[1])
+		end
+		return Hub
+	end
+
+	---Build the window and run the tabs in CONFIG.tabs, then every builder.
+	---LazyBoot (the loader, or a project that wants to prepare first) can set
+	---Hub.deferBoot = true before the library finishes loading; the window is
+	---then only built by the first Hub:Init()/Hub:Mount().
+	if not Hub.deferBoot then
+		Hub.Init(Hub._initOptions)
+	end
 
 	-- No `return` here on purpose: a return inside a do-block at the top level
 	-- ends the whole chunk, so anything the loader appends after this file
 	-- (a second module, a test spec) would never run. Loaders read
-	-- _G.AngelHub instead.
+	-- _G.FatCatHub instead.
 end

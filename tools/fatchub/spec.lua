@@ -1,7 +1,7 @@
 -- ==========================================================================
 -- Assertions
 -- ==========================================================================
-local Hub = _G.AngelHub
+local Hub = _G.FatCatHub
 check("Hub exposed on _G", Hub ~= nil)
 if not Hub then
 	print("\nCannot continue without the hub.")
@@ -12,7 +12,7 @@ check("ScreenGui created", Hub._screen ~= nil and Hub._screen.Parent ~= nil)
 check("window frame created", Hub._window ~= nil and Hub._window.frame ~= nil)
 check("window default size", Hub._window.width == 460 and Hub._window.height == 560)
 check("one default tab", Hub._window.pages["Main"] ~= nil)
-check("title label text", Hub._window.titleLabel.Text == "Angel Hub")
+check("title label text", Hub._window.titleLabel.Text == "FatCat Hub")
 
 local built = Hub._screen:_descendants()
 check("instance tree built", built > 40, built .. " descendants")
@@ -217,7 +217,7 @@ check("search restores rows", restored >= 6, restored .. " visible")
 Hub.Setters.feature(true)
 Hub.Setters.volume(3.5, true)
 local saved = Hub:Save(false)
-check("save writes a file", saved == true and files["AngelHub/config.json"] ~= nil)
+check("save writes a file", saved == true and files["FatCatHub/config.json"] ~= nil)
 Hub.Setters.volume(9, true)
 Hub.Setters.feature(false, true)
 local loaded = Hub:Load(false)
@@ -264,9 +264,39 @@ check("menu key hides the window", windowFrame.Visible == false)
 Hub._window:Toggle()
 check("menu key shows the window", windowFrame.Visible == true)
 
+-- ==========================================================================
+-- Mount: adding the project's own tab after the library has loaded.
+-- This is the shape the loader is meant to be used in, so it is the shape
+-- that has to be tested.
+-- ==========================================================================
+
+local mountedRuns = 0
+Hub:Mount(function(hub, window)
+	mountedRuns += 1
+	local page = window:Tab("Tools") or window:AddTab("Tools")
+	local box = page:Section("Tools", 1)
+	box:Toggle({ Text = "Mounted toggle", Default = true, Flag = "mountedToggle" })
+end)
+
+check("Mount builds a tab after load", Hub._window.pages["Tools"] ~= nil)
+check("Mount ran its builder once", mountedRuns == 1, mountedRuns)
+check("mounted widget registered a flag", Hub.Values.mountedToggle == true)
+check("main tab survived the mount", Hub._window.pages["Main"] ~= nil)
+check("mounted toggle is searchable", Hub._window:Tab("Tools") ~= nil)
+
+-- A rebuild has to re-run the builders, otherwise the window comes back empty.
+Hub:Init(Hub._initOptions)
+check("rebuild re-runs mounted builders", mountedRuns == 2, mountedRuns)
+check("rebuild keeps the mounted tab", Hub._window.pages["Tools"] ~= nil)
+
+-- Unmounting and rebuilding must not leave stale builders behind.
+Hub._builders = {}
+Hub:Init(Hub._initOptions)
+check("cleared builders do not run", mountedRuns == 2, mountedRuns)
+
 Hub:Destroy()
 check("destroy removes the screen", Hub._screen.Parent == nil)
-check("destroy clears _G", _G.AngelHub == nil)
+check("destroy clears _G", _G.FatCatHub == nil)
 local stillConnected = 0
 for _, connection in Hub.Connections do
 	if connection.Connected then

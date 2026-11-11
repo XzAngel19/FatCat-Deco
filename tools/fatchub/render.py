@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw the layout dump from tools/angelhub/layout.lua into a PNG.
+"""Draw the layout dump from tools/fatchub/layout.lua into a PNG.
 
 Pure stdlib: zlib + struct, no Pillow in the sandbox. Filled rounded rects,
 1px borders, alpha blended in source order, and text drawn as a dim underline
@@ -93,7 +93,7 @@ def main() -> int:
         print("usage: render.py <layout.txt> [out.png]", file=sys.stderr)
         return 2
     source = Path(sys.argv[1])
-    out = Path(sys.argv[2] if len(sys.argv) > 2 else "build/AngelHub.png")
+    out = Path(sys.argv[2] if len(sys.argv) > 2 else "build/FatCatHub.png")
     nodes = parse(source)
     if not nodes:
         print("render: no nodes parsed", file=sys.stderr)

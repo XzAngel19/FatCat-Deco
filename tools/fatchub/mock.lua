@@ -1,9 +1,9 @@
--- Roblox DataModel mock for src/AngelHub.lua.
+-- Roblox DataModel mock for src/FatCatHub.lua.
 --
--- Not run directly: tools/test_angelhub.sh concatenates this file, the hub
--- source and tools/angelhub/spec.lua into build/test_angelhub.lua and runs
+-- Not run directly: tools/test_fatchub.sh concatenates this file, the hub
+-- source and tools/fatchub/spec.lua into build/test_fatchub.lua and runs
 -- that. One chunk, no loadstring: the wasm VM cannot re-enter its own compiler
--- from a JS callback, and the original Angel Hub shipped the same way (shell
+-- from a JS callback, and the original FatCat Hub shipped the same way (shell
 -- and features as two blocks of one script).
 --
 -- The Luau VM here is the real one; Roblox is simulated. Every property write

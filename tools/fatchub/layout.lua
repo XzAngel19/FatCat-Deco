@@ -1,7 +1,7 @@
 -- Layout introspection for the visual harness.
 --
 -- Appended to the same generated chunk as the mock and the hub (see
--- tools/render_angelhub.sh). Two passes:
+-- tools/render_fatchub.sh). Two passes:
 --
 --   1. measure — walk the built ScreenGui and resolve every GuiObject's
 --      absolute rect (AnchorPoint, scale/offset size and position, UIListLayout,
@@ -10,7 +10,7 @@
 --      painter's algorithm has the right z-order.
 --
 -- Prints one JSON line per drawable node between LAYOUT_JSON_BEGIN/END.
--- Text is reported with its box; tools/angelhub/render.py draws a placeholder
+-- Text is reported with its box; tools/fatchub/render.py draws a placeholder
 -- bar, so this proves geometry, stacking and colour, not letterforms.
 
 local VIEWPORT = { width = 1280, height = 720 }

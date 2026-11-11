@@ -87,22 +87,28 @@ tools/luau/bin/luau-validate build/Cobalt.min.lua >build/minify.validate.log 2>&
 }
 echo "PASS release artifact: minified Cobalt still validates"
 
-# --- Angel Hub -------------------------------------------------------------
+# --- FatCat Hub -------------------------------------------------------------
 # The menu is the only real Luau program in the tree, so it gets its own gates:
 # it compiles, the analyzer is clean (no baseline entry hides it), and the
 # mocked-DataModel harness passes.
-if [ -f src/AngelHub.lua ]; then
-    "$LUAU_COMPILE" src/AngelHub.lua src/AngelHub.loader.lua >/dev/null
-    node tools/luau/analyze.mjs --quiet src/AngelHub.lua src/AngelHub.loader.lua \
-        >build/angelhub.analyze.txt 2>&1 || {
-        cat build/angelhub.analyze.txt
+if [ -f src/FatCatHub.lua ]; then
+    # The specs are compiled by their own harnesses, which wrap them correctly.
+    "$LUAU_COMPILE" src/FatCatHub.lua src/FatCatHub.loader.lua src/FatCatHub.project.lua >/dev/null
+    node tools/luau/analyze.mjs --quiet src/FatCatHub.lua src/FatCatHub.loader.lua \
+        src/FatCatHub.project.lua >build/fatchub.analyze.txt 2>&1 || {
+        cat build/fatchub.analyze.txt
         exit 1
     }
-    bash tools/test_angelhub.sh >build/angelhub.test.log 2>&1 || {
-        tail -20 build/angelhub.test.log
+    bash tools/test_fatchub.sh >build/fatchub.test.log 2>&1 || {
+        tail -20 build/fatchub.test.log
         exit 1
     }
-    tail -1 build/angelhub.test.log
+    grep -E "^PASS" build/fatchub.test.log
+    bash tools/test_fatchub_loader.sh >build/fatchub.loader.test.log 2>&1 || {
+        tail -20 build/fatchub.loader.test.log
+        exit 1
+    }
+    grep -E "^PASS" build/fatchub.loader.test.log
 fi
 
 # --- toolchain self-test --------------------------------------------------

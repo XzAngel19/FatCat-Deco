@@ -1,4 +1,4 @@
-# Angel Hub — menú vacío, listo para llenar
+# FatCat Hub — menú vacío, listo para llenar
 
 El shell del menú que subiste (`cule.txt`), sin una sola línea de Illegal Soccer.
 El GUI es el mismo de arriba a abajo — ventana arrastrable, pestañas con
@@ -7,23 +7,23 @@ toasts, config, minimizar, resize — y todo lo que era del juego se fue.
 Las pestañas están vacías a propósito: **el menú no registra ningún módulo**.
 
 ```
-src/AngelHub.lua          el menú completo (shell + componentes + API)
-src/AngelHub.loader.lua   loader de una línea
-tools/angelhub/           harness: mock de Roblox, asserts, render PNG
-docs/ANGEL-HUB.md         esto
+src/FatCatHub.lua          el menú completo (shell + componentes + API)
+src/FatCatHub.loader.lua   loader de una línea
+tools/fatchub/           harness: mock de Roblox, asserts, render PNG
+docs/FATCAT-HUB.md         esto
 ```
 
 ## Loader
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/AngelHub.loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/FatCatHub.loader.lua"))()
 ```
 
-El loader baja `src/AngelHub.lua`, lo compila (con el número de línea exacto si
-hay error de sintaxis), lo ejecuta y devuelve `_G.AngelHub`. Para cerrarlo:
+El loader baja `src/FatCatHub.lua`, lo compila (con el número de línea exacto si
+hay error de sintaxis), lo ejecuta y devuelve `_G.FatCatHub`. Para cerrarlo:
 
 ```lua
-getgenv().AngelHubUnload()
+getgenv().FatCatHubUnload()
 ```
 
 También funciona pegado directo en el executor, sin loader.
@@ -31,7 +31,7 @@ También funciona pegado directo en el executor, sin loader.
 ## Llenar el menú
 
 ```lua
-local Hub = _G.AngelHub
+local Hub = _G.FatCatHub
 local Window = Hub._window
 
 -- Pestañas: la primera existe ("Main"). Se pueden añadir más en caliente.
@@ -85,7 +85,7 @@ Hub.Setters.fov(120, true)       -- aplica sin callback
 ### Persistencia
 
 ```lua
-Hub:Save(true)     -- AngelHub/config.json  (notifica el resultado)
+Hub:Save(true)     -- FatCatHub/config.json  (notifica el resultado)
 Hub:Load(true)
 Hub:Reset(true)
 Hub:Copy()         -- JSON al portapapeles
@@ -151,19 +151,19 @@ Mejoras visuales:
 
 ```bash
 bash tools/luau/setup.sh          # toolchain (una vez)
-bash tools/test_angelhub.sh       # 63 asserts sobre Roblox simulado
-bash tools/render_angelhub.sh     # build/AngelHub.png
+bash tools/test_fatchub.sh       # 63 asserts sobre Roblox simulado
+bash tools/render_fatchub.sh     # build/FatCatHub.png
 ```
 
-`tools/angelhub/mock.lua` simula el DataModel: instancias, señales, tweens
+`tools/fatchub/mock.lua` simula el DataModel: instancias, señales, tweens
 (inmediatos), `task` (manual, con `flush()`), `HttpService` con JSON real,
 archivos en memoria y `typeof`/`Color3` con los tipos de Roblox. Los asserts
 comprueban que los valores llegan a los setters, que los callbacks disparan una
 vez, el buscador, save/load/reset, cambio de pestaña y que `Destroy` desconecta
 todo.
 
-`tools/angelhub/layout.lua` mide el árbol construido (AnchorPoint, escala,
-`UIListLayout`, `UIPadding`, `AutomaticSize`) y `tools/angelhub/render.py` lo
+`tools/fatchub/layout.lua` mide el árbol construido (AnchorPoint, escala,
+`UIListLayout`, `UIPadding`, `AutomaticSize`) y `tools/fatchub/render.py` lo
 dibuja a PNG en stdlib puro. El texto sale como barra proporcional: el render
 prueba geometría, apilado, color y recorte, **no** las letras.
 

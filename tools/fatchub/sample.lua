@@ -1,6 +1,6 @@
 -- Sample content used by the visual harness only: fills the shell with one of
 -- every component so the render shows real rows instead of an empty window.
-local Hub = _G.AngelHub
+local Hub = _G.FatCatHub
 local page = Hub._window:Tab("Main")
 
 local left = page:Section("Toggles")

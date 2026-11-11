@@ -2,7 +2,7 @@
 
 Herramientas y banco de trabajo para leer, validar y volver a emitir código
 Luau de Roblox (`Cobalt.txt`, un bundle runtime de 467 KB), más el shell del
-menú **Angel Hub**.
+menú **FatCat Hub**.
 
 ## Arranque
 
@@ -10,23 +10,23 @@ menú **Angel Hub**.
 bash tools/luau/setup.sh --verify   # toolchain Luau desde los tarballs vendorizados
 bash tools/validate.sh              # puerta completa del toolchain
 bash tools/validate.sh --quick      # sin el type checker
-bash tools/test_angelhub.sh         # 63 asserts sobre el menú (Roblox simulado)
-bash tools/render_angelhub.sh       # build/AngelHub.png
+bash tools/test_fatchub.sh         # 63 asserts sobre el menú (Roblox simulado)
+bash tools/render_fatchub.sh       # build/FatCatHub.png
 ```
 
 Solo necesita `node` (v22) y `python3`. No hay `npm install` ni descargas: todo
 está vendorizado en `tools/luau/vendor/`.
 
-## Angel Hub (menú vacío)
+## FatCat Hub (menú vacío)
 
 ```
-src/AngelHub.lua          el menú: shell, componentes, API
-src/AngelHub.loader.lua   loader de una línea
-docs/ANGEL-HUB.md         API, componentes y lista de bugs corregidos
+src/FatCatHub.lua          el menú: shell, componentes, API
+src/FatCatHub.loader.lua   loader de una línea
+docs/FATCAT-HUB.md         API, componentes y lista de bugs corregidos
 ```
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/AngelHub.loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/FatCatHub.loader.lua"))()
 ```
 
 ## Herramientas
@@ -51,6 +51,6 @@ node tools/luau/analyze.mjs --baseline            # 0 errores nuevos
 
 ## Documentación
 
-- [`docs/ANGEL-HUB.md`](docs/ANGEL-HUB.md) — el menú: API, componentes, bugs.
+- [`docs/FATCAT-HUB.md`](docs/FATCAT-HUB.md) — el menú: API, componentes, bugs.
 - [`docs/LUAU-TOOLCHAIN.md`](docs/LUAU-TOOLCHAIN.md) — qué se instaló y por qué.
 - `AGENTS.md` — guía de trabajo del repositorio.
