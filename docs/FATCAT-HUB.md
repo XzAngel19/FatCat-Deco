@@ -1,4 +1,4 @@
-# FatCat Hub — menú vacío, listo para llenar
+# Fat Cat — menú vacío, listo para llenar
 
 El shell del menú que subiste (`cule.txt`), sin una sola línea de Illegal Soccer.
 El GUI es el mismo de arriba a abajo — ventana arrastrable, pestañas con
@@ -24,7 +24,7 @@ Ojo con la URL: **`main` todavía no tiene `src/`**, así que ese archivo solo
 existe en la rama de trabajo. Mientras no esté mergeado:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/4918f801-fatcat-deco/src/FatCatHub.loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/3f9165cb-fatcat-deco/src/FatCatHub.loader.lua"))()
 ```
 
 El loader, una vez que corre, resuelve el resto solo: prueba `main` primero y
@@ -171,8 +171,13 @@ Bugs reales encontrados y corregidos (cada uno verificado por el harness):
 | 15 | **Solo `RightShift`** | un teclado de portátil no tiene shift derecho: el menú parecía roto. Ahora `menuKey` acepta una lista |
 | 16 | **`Ctrl+H` exigía `LeftControl`** | con el control derecho no pasaba nada. Ahora cualquiera de los dos, y comparando por `KeyCode.Name` |
 | 17 | **Una tecla consumida por el juego fallaba en silencio** | indistinguible de un hotkey roto. Ahora avisa con un toast |
+| 18 | **La sombra vivía suelta en el ScreenGui** | al arrastrar o ocultar la ventana las capas se quedaban atrás: un rectángulo semi-transparente "plasmado" en el mapa, y RightShift parecía no funcionar porque el fantasma seguía ahí. Ahora las tres capas cuelgan de un host que espeja `Position`, `Size` y `Visible` del frame |
+| 19 | **El closure de listening del keybind nunca soltaba `Hub._listening`** | tras rebindear una vez, cada tecla siguiente (RightShift incluido) se la comía el chip viejo y el hotkey moría hasta recargar. Ahora el closure y el dispatch limpian el slot |
+| 20 | **El título decía `FatCat Hub`** | el producto se llama **Fat Cat**, con espacio y sin "Hub". Y el punto de la barra es la luz de inyección: verde (`THEME.positive`), nunca gris |
+| 21 | **Líneas semi-transparentes sueltas arriba y en la esquina** | el sheen blanco, el hairline sobre las pestañas y los tres grips del resize se veían como basura semi-transparente (y el sheen asomaba cuadrado por la esquina redondeada). Todo eso ahora es transparente sí o sí: la barra no lleva overlay y la esquina de resize no dibuja nada |
+| 22 | **Buscador mínimo** | ahora lleva lupa dibujada, botón `×` para limpiar, Escape que vacía y suelta el foco, y se ensancha hacia la izquierda al enfocar sin mover los botones de la barra |
 
-Los tres últimos salieron del harness nuevo, no del original.
+Los tres primeros de esta tanda salieron del harness nuevo, no del original.
 
 Mejoras visuales:
 
@@ -180,8 +185,13 @@ Mejoras visuales:
   El original se leía como una losa negra.
 - **Hover honesto**: la tarjeta aclara y el borde se enciende, en vez del salto
   de transparencia `0.35 ↔ 0.65`.
-- **Sombra real**: tres capas desplazadas detrás de la ventana; también se mueve
-  al arrastrar.
+- **Sombra real**: tres capas desplazadas detrás de la ventana, colgadas de un
+  host invisible que espeja el frame: se mueve al arrastrar, encoge al
+  minimizar y desaparece al ocultar la ventana.
+- **Barra de título limpia**: sin sheen ni hairline semi-transparente; el punto
+  de marca es verde (inyección correcta) y respira sin apagarse.
+- **Buscador**: lupa dibujada, `×` para limpiar, Escape para vaciar y soltar el
+  foco, y expansión hacia la izquierda al enfocar.
 - **Tipografía**: `Gotham` / `GothamMedium` / `GothamBold` (el original mezclaba
   SourceSans con pesos inconsistentes).
 - **Columnas exactas**: el cálculo viejo dejaba la columna derecha más angosta

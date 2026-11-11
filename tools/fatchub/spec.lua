@@ -12,7 +12,27 @@ check("ScreenGui created", Hub._screen ~= nil and Hub._screen.Parent ~= nil)
 check("window frame created", Hub._window ~= nil and Hub._window.frame ~= nil)
 check("window default size", Hub._window.width == 460 and Hub._window.height == 560)
 check("one default tab", Hub._window.pages["Main"] ~= nil)
-check("title label text", Hub._window.titleLabel.Text == "FatCat Hub")
+check("title label text", Hub._window.titleLabel.Text == "Fat Cat")
+local brandColor = Hub._window.brand.BackgroundColor3
+check("brand dot is the green injection light",
+	math.abs(brandColor.R * 255 - 124) < 1 and math.abs(brandColor.G * 255 - 222) < 1 and math.abs(brandColor.B * 255 - 146) < 1,
+	tostring(brandColor.R * 255) .. "," .. tostring(brandColor.G * 255) .. "," .. tostring(brandColor.B * 255))
+check("resize corner carries no grip lines", #Hub._window.resizeHandle:GetChildren() == 0,
+	#Hub._window.resizeHandle:GetChildren() .. " children")
+
+-- The shadow host is what stops the ghost rectangle: it mirrors the frame
+-- on every move, resize and hide.
+local mirrorFrame = Hub._window.frame
+local mirrorShadow = Hub._window.shadow
+mirrorFrame.Position = UDim2.new(0, 123, 0, 45)
+check("shadow follows the window", mirrorShadow.Position.X.Offset == 123 and mirrorShadow.Position.Y.Offset == 45)
+mirrorFrame.Size = UDim2.fromOffset(400, 300)
+check("shadow follows resizes", mirrorShadow.Size.X.Offset == 400 and mirrorShadow.Size.Y.Offset == 300)
+mirrorFrame.Visible = false
+check("shadow hides with the window", mirrorShadow.Visible == false)
+mirrorFrame.Visible = true
+mirrorFrame.Size = UDim2.fromOffset(460, 560)
+mirrorFrame.Position = UDim2.new(0.5, -230, 0.5, -280)
 
 local built = Hub._screen:_descendants()
 check("instance tree built", built > 40, built .. " descendants")
@@ -210,6 +230,25 @@ for _, searchable in Hub.Searchables do
 	end
 end
 check("search restores rows", restored >= 6, restored .. " visible")
+
+-- The field itself: placeholder, clear button and Escape.
+local searchBox = Hub._window.searchBox
+check("search placeholder is Buscar", searchBox.PlaceholderText == "Buscar...", searchBox.PlaceholderText)
+local searchClear = searchBox.Parent:FindFirstChild("ClearSearch")
+check("clear button starts hidden", searchClear ~= nil and searchClear.Visible == false)
+searchBox.Text = "volum"
+check("clear button appears with text", searchClear.Visible == true)
+searchClear.Activated:Fire()
+check("clear button empties the field", searchBox.Text == "")
+check("clear button hides again", searchClear.Visible == false)
+searchBox:CaptureFocus()
+searchBox.Text = "aim"
+check("search field knows it is focused", searchBox:IsFocused() == true)
+game:GetService("UserInputService").InputBegan:Fire({
+	UserInputType = Enum.UserInputType.Keyboard,
+	KeyCode = Enum.KeyCode.Escape,
+}, false)
+check("escape clears and releases the search field", searchBox.Text == "" and searchBox:IsFocused() == false)
 
 -- ==========================================================================
 -- Save / load / reset

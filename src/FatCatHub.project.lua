@@ -1,4 +1,4 @@
--- FatCat Hub | proyecto: las ventanas del decompiler.
+-- Fat Cat | proyecto: las ventanas del decompiler.
 --
 -- Tres pestañas, todas con datos reales del executor cuando existen y con un
 -- aviso honesto cuando no:
@@ -13,7 +13,7 @@
 
 local Hub = _G.FatCatHub
 if not Hub then
-	warn("[FatCat Hub] the library is not loaded - run the loader first")
+	warn("[Fat Cat] the library is not loaded - run the loader first")
 	-- Sin return: este archivo se concatena después de la librería en el
 	-- harness y un return de nivel superior terminaría el chunk.
 end

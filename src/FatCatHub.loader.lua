@@ -1,4 +1,4 @@
--- FatCat Hub | loader.
+-- Fat Cat | loader.
 --
 --   loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/main/src/FatCatHub.loader.lua"))()
 --
@@ -20,6 +20,7 @@
 -- Set _G.FatCatHubBranch = "some/branch" to force one.
 local BRANCHES = {
 	"main",
+	"arena/3f9165cb-fatcat-deco",
 	"arena/4918f801-fatcat-deco",
 }
 
@@ -42,12 +43,12 @@ end
 
 local function verbose(...)
 	if _G.FatCatHubVerbose then
-		print("[FatCat Hub]", ...)
+		print("[Fat Cat]", ...)
 	end
 end
 
 local function report(message)
-	warn("[FatCat Hub] " .. message)
+	warn("[Fat Cat] " .. message)
 end
 
 -- Reject anything that did not come back as the library: a 404 page, an
@@ -63,7 +64,7 @@ local function looksLikeSource(body)
 		return false, "the server returned HTML instead of Lua"
 	end
 	if not body:find("_G.FatCatHub", 1, true) then
-		return false, "the file did not look like the FatCat Hub library"
+		return false, "the file did not look like the Fat Cat library"
 	end
 	return true
 end
@@ -179,7 +180,7 @@ if not Hub or not Hub._window then
 end
 
 pcall(function()
-	print(("[FatCat Hub] ready - %s, press %s"):format(
+	print(("[Fat Cat] ready - %s, press %s"):format(
 		Hub._window.selected or "Main",
 		tostring(Hub.menuKey or "RightShift")
 	))

@@ -303,15 +303,16 @@ local signalNames = {
 function Instance.new(className)
 	instanceCount += 1
 	local instance
+	-- Name/Visible/Text live in _props, not in raw fields: Lua only runs
+	-- __newindex for keys the table does NOT have, so a raw field would
+	-- swallow every later assignment and its GetPropertyChangedSignal fire.
+	-- Every property goes through _props so property signals are real.
 	instance = {
 		ClassName = className,
-		Name = className,
 		_children = {},
 		_attributes = {},
-		_props = {},
+		_props = { Name = className, Visible = true, Text = "" },
 		_parent = nil,
-		Visible = true,
-		Text = "",
 		Destroyed = false,
 	}
 
@@ -319,6 +320,29 @@ function Instance.new(className)
 
 	for _, signalName in signalNames do
 		instance[signalName] = newSignal(signalName, instance)
+	end
+
+	-- TextBox focus API: the shell drives it with Escape and with the search
+	-- clear button, so a harness without it would silently skip both paths.
+	if className == "TextBox" then
+		instance._focused = false
+		function instance:CaptureFocus()
+			if self._focused then
+				return
+			end
+			self._focused = true
+			self.Focused:Fire()
+		end
+		function instance:ReleaseFocus()
+			if not self._focused then
+				return
+			end
+			self._focused = false
+			self.FocusLost:Fire(false)
+		end
+		function instance:IsFocused()
+			return self._focused == true
+		end
 	end
 
 	function instance:GetPropertyChangedSignal(property)
@@ -466,6 +490,10 @@ function Instance.new(className)
 			if key == "Children" then
 				return self._children
 			end
+			local props = rawget(self, "_props")
+			if props and props[key] ~= nil then
+				return props[key]
+			end
 			return nil
 		end,
 		__newindex = function(self, key, value)
@@ -483,7 +511,7 @@ function Instance.new(className)
 				end
 				return
 			end
-			rawset(self, key, value)
+			self._props[key] = value
 			if changed[key] then
 				changed[key]:Fire()
 			end

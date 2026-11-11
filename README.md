@@ -2,7 +2,7 @@
 
 Herramientas y banco de trabajo para leer, validar y volver a emitir código
 Luau de Roblox (`Cobalt.txt`, un bundle runtime de 467 KB), más el shell del
-menú **FatCat Hub**.
+menú **Fat Cat**.
 
 ## Arranque
 
@@ -18,7 +18,7 @@ bash tools/render_fatchub.sh        # build/FatCatHub.png
 Solo necesita `node` (v22) y `python3`. No hay `npm install` ni descargas: todo
 está vendorizado en `tools/luau/vendor/`.
 
-## FatCat Hub (menú del decompiler)
+## Fat Cat (menú del decompiler)
 
 ```
 src/FatCatHub.lua          el menú: shell, componentes, API
@@ -29,7 +29,7 @@ docs/FATCAT-HUB.md         API, componentes y lista de bugs corregidos
 
 ```lua
 -- main todavía no tiene src/, así que hoy el loader vive en la rama de trabajo
-loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/4918f801-fatcat-deco/src/FatCatHub.loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/3f9165cb-fatcat-deco/src/FatCatHub.loader.lua"))()
 ```
 
 Una vez cargado, el loader resuelve solo de qué rama bajar la librería (prueba

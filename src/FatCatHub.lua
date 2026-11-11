@@ -1,4 +1,4 @@
--- FatCat Hub | library, loader and UI builder.
+-- Fat Cat | library, loader and UI builder.
 -- Derived from the FatCat Hub menu (KaliHub shell): the game-specific code is gone, the
 -- shell is rebuilt. Exposes _G.FatCatHub for loader scripts and game modules.
 --
@@ -38,7 +38,8 @@ do
 	-- Config
 	-- ======================================================================
 	local CONFIG = {
-		title = "FatCat Hub",
+		-- Two words, no "Hub": that is the product name the menu shows.
+		title = "Fat Cat",
 		version = "1.0.0",
 		width = 460,
 		height = 560,
@@ -56,6 +57,7 @@ do
 		-- only opens with a key you do not have looks like a broken menu.
 		menuKey = { "RightShift", "LeftShift" },
 		hintsKeys = { "H" },
+		searchPlaceholder = "Buscar...",
 		saveFolder = "FatCatHub",
 		saveFile = "FatCatHub/config.json",
 		prefsFile = "FatCatHub/preferences.json",
@@ -1304,6 +1306,7 @@ do
 			Hub._cancelListening = function()
 				listening = false
 				Hub._cancelListening = nil
+				Hub._listening = nil
 				retween(chipStroke, ANIM.fast, { Color = THEME.outline, Transparency = 0.35 })
 				chip.Text = current and tostring(current.Name) or "None"
 			end
@@ -1311,6 +1314,11 @@ do
 			Hub._listening = function(keyCode)
 				listening = false
 				Hub._cancelListening = nil
+				-- Release the global slot: while _listening is set, every
+				-- keypress in the game is routed here instead of the menu
+				-- hotkey, so a session that never clears it silently kills
+				-- RightShift until the hub is reloaded.
+				Hub._listening = nil
 				retween(chipStroke, ANIM.fast, { Color = THEME.outline, Transparency = 0.35 })
 				applyName(keyCode == Enum.KeyCode.Escape and "" or keyCode.Name)
 			end
@@ -2110,69 +2118,77 @@ do
 
 		-- Soft drop shadow: three offset frames, cheap enough to keep on a
 		-- 60 fps UI and it stops the window floating flat over bright maps.
-		-- ipairs: a `for k, v in array` walk yields (index, value), not pairs.
+		-- The layers live inside one invisible host that mirrors the window
+		-- frame: shadows parented straight to the screen used to stay behind
+		-- when the window moved or hid, leaving a ghost rectangle "printed"
+		-- on the map at the old position.
+		local shadowHost = create("Frame", {
+			Name = "Shadow",
+			Size = frame.Size,
+			Position = frame.Position,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ZIndex = -1,
+		}, screen)
+		window.shadow = shadowHost
 		for _, layer in { { offset = 2, alpha = 0.86 }, { offset = 5, alpha = 0.92 }, { offset = 9, alpha = 0.96 } } do
-			local offset = layer.offset
-			local alpha = layer.alpha
 			local shadow = create("Frame", {
-				Size = UDim2.fromOffset(CONFIG.width, CONFIG.height),
-				Position = UDim2.new(0.5, -CONFIG.width / 2 + offset, 0.5, -CONFIG.height / 2 + offset),
+				Size = UDim2.new(1, 0, 1, 0),
+				Position = UDim2.fromOffset(layer.offset, layer.offset),
 				BackgroundColor3 = Color3.new(0, 0, 0),
-				BackgroundTransparency = alpha,
+				BackgroundTransparency = layer.alpha,
 				BorderSizePixel = 0,
-				ZIndex = -1,
-			}, screen)
+			}, shadowHost)
 			round(shadow, CONFIG.cornerRadius)
-			window.shadow = shadow
 		end
+
+		-- One mirror for every way the frame can move: drags, clamps, the
+		-- minimise tween and ResetPosition all go through these properties.
+		local function syncShadowHost()
+			shadowHost.Size = frame.Size
+			shadowHost.Position = frame.Position
+			shadowHost.Visible = frame.Visible
+		end
+		connect(frame:GetPropertyChangedSignal("Size"), syncShadowHost)
+		connect(frame:GetPropertyChangedSignal("Position"), syncShadowHost)
+		connect(frame:GetPropertyChangedSignal("Visible"), syncShadowHost)
+		syncShadowHost()
 
 		local windowScale = create("UIScale", { Scale = 0.94 }, frame)
 		retween(windowScale, ANIM.pop, { Scale = 1 })
 
-		-- Top sheen.
-		local sheen = create("Frame", {
-			Size = UDim2.new(1, 0, 0, 150),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderSizePixel = 0,
-		}, frame)
-		create("UIGradient", {
-			Transparency = NumberSequence.new(0.972, 1),
-			Rotation = 90,
-		}, sheen)
-
 		-- ---------------------------------------------------------------- title
-		local titleBar = create("Frame", {
+		-- A label-less TextButton: the drag surface has to hit-test while
+		-- staying completely invisible, and a plain Frame does not guarantee
+		-- that once its background is fully transparent. No sheen, no gloss
+		-- gradient, no hairline over the tabs either: every semi-transparent
+		-- overlay up here used to leak a pale square past the rounded corner
+		-- and read as a dirty line over the tab strip. The title bar is now
+		-- transparent, period.
+		local titleBar = create("TextButton", {
 			Size = UDim2.new(1, 0, 0, CONFIG.titleHeight),
-			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
+			Text = "",
+			AutoButtonColor = false,
 		}, frame)
-		create("UIGradient", {
-			Transparency = NumberSequence.new(0.82, 0.94),
-			Rotation = 90,
-		}, titleBar)
-		local titleLine = create("Frame", {
-			Size = UDim2.new(1, 0, 0, 1),
-			Position = UDim2.new(0, 0, 1, -1),
-			BackgroundColor3 = THEME.outline,
-			BackgroundTransparency = 0.5,
-			BorderSizePixel = 0,
-		}, titleBar)
-		create("UIGradient", { Transparency = NumberSequence.new(0.2, 0.9), Rotation = 0 }, titleLine)
 
-		-- Brand dot.
+		-- Brand dot: green is the injection light. Green means the library
+		-- is live, so it ships green and the breathe never fades it past a
+		-- quarter transparent - a dot that washes out reads as "not injected".
 		local brand = create("Frame", {
 			Size = UDim2.fromOffset(9, 9),
 			Position = UDim2.fromOffset(14, CONFIG.titleHeight / 2 - 4.5),
-			BackgroundColor3 = Color3.new(1, 1, 1),
+			BackgroundColor3 = THEME.positive,
 			BorderSizePixel = 0,
 		}, titleBar)
 		round(brand, 999)
-		liveGradient(brand, 45)
 		tweenService:Create(
 			brand,
-			TweenInfo.new(1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-			{ BackgroundTransparency = 0.55 }
+			TweenInfo.new(2.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+			{ BackgroundTransparency = 0.22 }
 		):Play()
+		window.brand = brand
 
 		local titleLabel = create("TextLabel", {
 			Size = UDim2.new(1, -220, 1, 0),
@@ -2187,13 +2203,16 @@ do
 		}, titleBar)
 		window.titleLabel = titleLabel
 
+		-- Search field: magnifier on the left, clear button on the right, and
+		-- it grows to the left on focus so the title bar buttons never move.
+		local SEARCH_W, SEARCH_H, SEARCH_WIDE = 150, 26, 190
 		local searchBox = create("TextBox", {
-			Size = UDim2.fromOffset(124, 24),
-			Position = UDim2.new(1, -202, 0.5, -12),
+			Size = UDim2.fromOffset(SEARCH_W, SEARCH_H),
+			Position = UDim2.new(1, -78 - SEARCH_W, 0.5, -SEARCH_H / 2),
 			BackgroundColor3 = THEME.element,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
-			PlaceholderText = "Search",
+			PlaceholderText = CONFIG.searchPlaceholder,
 			PlaceholderColor3 = THEME.textDim,
 			Text = "",
 			TextColor3 = THEME.text,
@@ -2202,8 +2221,8 @@ do
 			ClearTextOnFocus = false,
 			TextXAlignment = Enum.TextXAlignment.Left,
 		}, titleBar)
-		round(searchBox, 6)
-		create("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, searchBox)
+		round(searchBox, 7)
+		create("UIPadding", { PaddingLeft = UDim.new(0, 25), PaddingRight = UDim.new(0, 24) }, searchBox)
 		local searchStroke = create("UIStroke", {
 			Color = THEME.outline,
 			Transparency = 0.55,
@@ -2211,11 +2230,88 @@ do
 		}, searchBox)
 		window.searchBox = searchBox
 
+		-- Magnifier: a stroked ring plus a rotated handle. Drawn, not a font
+		-- glyph, because Gotham has no magnifier and a missing glyph renders
+		-- as a blank box on some clients.
+		local searchIcon = create("Frame", {
+			Name = "Icon",
+			Size = UDim2.fromOffset(9, 9),
+			Position = UDim2.fromOffset(9, SEARCH_H / 2 - 6),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+		}, searchBox)
+		local iconRing = create("UIStroke", {
+			Color = THEME.textDim,
+			Transparency = 0.15,
+			Thickness = 1.4,
+		}, searchIcon)
+		round(searchIcon, 999)
+		local iconHandle = create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(5, 1.4),
+			Position = UDim2.fromOffset(12.5, SEARCH_H / 2 + 4),
+			BackgroundColor3 = THEME.textDim,
+			BorderSizePixel = 0,
+			Rotation = 45,
+		}, searchBox)
+		round(iconHandle, 999)
+
+		-- Clear button: pinned to the right edge of the field, which never
+		-- moves, so it can live beside the box instead of riding the tween.
+		local searchClear = create("TextButton", {
+			Name = "ClearSearch",
+			Size = UDim2.fromOffset(18, 18),
+			Position = UDim2.new(1, -96, 0.5, -9),
+			BackgroundColor3 = THEME.elementHover,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Text = "×",
+			TextColor3 = THEME.textOff,
+			TextSize = 13,
+			Font = FONT_BOLD,
+			AutoButtonColor = false,
+			Visible = false,
+		}, titleBar)
+		round(searchClear, 999)
+		searchClear.MouseEnter:Connect(function()
+			retween(searchClear, ANIM.fast, { BackgroundTransparency = 0.2, TextColor3 = THEME.text })
+		end)
+		searchClear.MouseLeave:Connect(function()
+			retween(searchClear, ANIM.fast, { BackgroundTransparency = 1, TextColor3 = THEME.textOff })
+		end)
+		searchClear.Activated:Connect(function()
+			searchBox.Text = ""
+			searchBox:CaptureFocus()
+		end)
+		searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+			searchClear.Visible = searchBox.Text ~= ""
+		end)
+
+		local searchFocused = false
+		window.isSearchFocused = function()
+			return searchFocused
+		end
 		searchBox.Focused:Connect(function()
+			searchFocused = true
 			retween(searchStroke, ANIM.fast, { Color = colorA, Transparency = 0 })
+			iconRing.Color = colorA
+			iconHandle.BackgroundColor3 = colorA
+			retween(searchBox, ANIM.medium, {
+				BackgroundColor3 = THEME.elementHover,
+				Size = UDim2.fromOffset(SEARCH_WIDE, SEARCH_H),
+				Position = UDim2.new(1, -78 - SEARCH_WIDE, 0.5, -SEARCH_H / 2),
+			})
 		end)
 		searchBox.FocusLost:Connect(function()
+			searchFocused = false
 			retween(searchStroke, ANIM.fast, { Color = THEME.outline, Transparency = 0.55 })
+			iconRing.Color = THEME.textDim
+			iconHandle.BackgroundColor3 = THEME.textDim
+			retween(searchBox, ANIM.medium, {
+				BackgroundColor3 = THEME.element,
+				Size = UDim2.fromOffset(SEARCH_W, SEARCH_H),
+				Position = UDim2.new(1, -78 - SEARCH_W, 0.5, -SEARCH_H / 2),
+			})
 		end)
 
 		---Title bar button.
@@ -2265,6 +2361,10 @@ do
 			if not dragStart or not isMove(input) then
 				return
 			end
+			-- The shadow host mirrors frame.Position through a property
+			-- signal, so the drag never touches it by hand: the old manual
+			-- sync moved one layer of three, and with the wrong offset math,
+			-- which is what left ghost rectangles on the map.
 			local delta = input.Position - dragStart
 			frame.Position = UDim2.new(
 				startPosition.X.Scale,
@@ -2272,14 +2372,6 @@ do
 				startPosition.Y.Scale,
 				startPosition.Y.Offset + delta.Y
 			)
-			if window.shadow and window.shadow.Parent then
-				window.shadow.Position = UDim2.new(
-					0,
-					frame.Position.X.Offset + 5,
-					0,
-					frame.Position.Y.Offset + 5
-				)
-			end
 		end)
 		connect(userInputService.InputEnded, function(input)
 			if not isPress(input) or not dragStart then
@@ -2287,9 +2379,6 @@ do
 			end
 			dragStart = nil
 			clampToViewport(frame)
-			if window.shadow and window.shadow.Parent then
-				window.shadow.Position = UDim2.new(0, frame.Position.X.Offset + 5, 0, frame.Position.Y.Offset + 5)
-			end
 		end)
 
 		minimizeButton.Activated:Connect(function()
@@ -2350,36 +2439,12 @@ do
 		}, frame)
 		window.resizeHandle = resizeHandle
 
-		for index = 1, 3 do
-			local grip = create("Frame", {
-				AnchorPoint = Vector2.new(1, 1),
-				Size = UDim2.fromOffset(index * 4, 1),
-				Position = UDim2.new(1, -4, 1, -4 - (3 - index) * 4),
-				BackgroundColor3 = THEME.textDim,
-				BorderSizePixel = 0,
-			}, resizeHandle)
-			round(grip, 999)
-		end
-
+		-- No grip lines. The corner used to carry three semi-transparent
+		-- dashes "to grab it by"; the menu reads cleaner with nothing there,
+		-- and the invisible 20x20 button still resizes on drag.
 		local resizing = false
 		local resizeStart, startWidth, startHeight
 
-		local function paintGrips(color)
-			for _, grip in resizeHandle:GetChildren() do
-				if grip:IsA("Frame") then
-					retween(grip, ANIM.fast, { BackgroundColor3 = color })
-				end
-			end
-		end
-
-		resizeHandle.MouseEnter:Connect(function()
-			paintGrips(colorA)
-		end)
-		resizeHandle.MouseLeave:Connect(function()
-			if not resizing then
-				paintGrips(THEME.textDim)
-			end
-		end)
 		resizeHandle.InputBegan:Connect(function(input)
 			if not isPress(input) then
 				return
@@ -2402,7 +2467,6 @@ do
 				return
 			end
 			resizing = false
-			paintGrips(THEME.textDim)
 		end)
 
 		-- ------------------------------------------------------------- search
@@ -2410,7 +2474,8 @@ do
 		---the same walk with an empty query, so a collapsed group stays
 		---collapsed instead of every row popping back.
 		local function applySearch(query)
-			local lowered = string.lower(query or "")
+			-- Surrounding spaces never mean anything in a filter.
+			local lowered = string.lower(string.match(query or "", "^%s*(.-)%s*$") or "")
 			local matched = {}
 			for _, card in Hub.Searchables do
 				if card.Parent then
@@ -2502,7 +2567,18 @@ do
 			-- gameProcessed check on purpose: while typing a new key into a
 			-- chip, the game is usually eating the keystroke.
 			if Hub._listening then
-				Hub._listening(input.KeyCode)
+				local listener = Hub._listening
+				Hub._listening = nil
+				listener(input.KeyCode)
+				return
+			end
+
+			-- Escape inside the search field clears it and lets go of the
+			-- keyboard. Before the gameProcessed check on purpose again: a
+			-- focused TextBox eats every key, Escape included.
+			if input.KeyCode == Enum.KeyCode.Escape and window.isSearchFocused and window.isSearchFocused() then
+				window.searchBox.Text = ""
+				window.searchBox:ReleaseFocus()
 				return
 			end
 
@@ -2617,12 +2693,18 @@ do
 
 		buildWindow()
 
+		-- Destroying the previous screen ran its Destroying handler, which
+		-- nils _G.FatCatHub when it owns the identity. Put it back, or every
+		-- game module that reads _G.FatCatHub after a rebuild sees nil and
+		-- reports "the library is not loaded".
+		_G.FatCatHub = Hub
+
 		-- Builders run against the fresh window, in the order they were added,
 		-- so a mounted module survives a rebuild.
 		for _, builder in Hub._builders do
 			local ok, builderError = pcall(builder, Hub, Hub._window)
 			if not ok then
-				warn("[FatCat Hub] a mounted builder failed: " .. tostring(builderError))
+				warn("[Fat Cat] a mounted builder failed: " .. tostring(builderError))
 			end
 		end
 
@@ -2737,7 +2819,7 @@ do
 		if Hub._window then
 			local ok, builderError = pcall(builder, Hub, Hub._window)
 			if not ok then
-				warn("[FatCat Hub] a mounted builder failed: " .. tostring(builderError))
+				warn("[Fat Cat] a mounted builder failed: " .. tostring(builderError))
 			end
 		end
 		return Hub
