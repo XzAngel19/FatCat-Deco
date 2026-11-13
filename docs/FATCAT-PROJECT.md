@@ -180,10 +180,19 @@ Reglas, y todas tienen un test que las cubre:
 
 ```bash
 python3 tools/build_bundle.py --check   # el bundle coincide con sus fuentes
-bash tools/test_fatchub_bundle.sh       # 100 asserts sobre el proyecto ensamblado
+python3 tools/lint_module_body.py       # ningún cuerpo lee una dependencia
+bash tools/test_fatchub_bundle.sh       # 100 asserts + la forma del árbol
 bash tools/test_fatchub_loader.sh       # 57 asserts del loader, con el bundle real
-node tools/luau/analyze.mjs --quiet "src/project/Core & Initialization"/FatCatInit.lua
+node tools/luau/analyze.mjs --quiet "src/project"
 ```
+
+`tools/lint_module_body.py` cubre un hueco que el type checker no puede ver: un
+nombre declarado y todavía sin asignar es `nil` en tiempo de ejecución, no un
+error de análisis. El lint distingue las tres cosas que se parecen en el cuerpo
+de un módulo — declarar (`local Core, Design`), construir lo propio
+(`Menu = {}`) y **leer una dependencia** (`local x = Core.env.foo`) — y solo la
+tercera es un fallo. Se salta los cuerpos de función a propósito: esos corren
+después de la fábrica.
 
 El arnés del loader no prueba un cuerpo inventado: `tools/test_fatchub_loader.sh`
 incrusta `src/FatCatHub.bundle.lua` tal como está en disco y se lo sirve al

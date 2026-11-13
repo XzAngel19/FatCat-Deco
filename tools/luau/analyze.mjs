@@ -14,7 +14,7 @@
 // The analyzer is the same Luau front end the game runs (luau-analyze through
 // wasm), fed with the Roblox API subset (definitions/roblox-api.d.luau) and the
 // executor surface (definitions/runtime.d.luau).
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,8 +39,32 @@ export function loadBaseline(path = BASELINE) {
     return Array.isArray(data.entries) ? data.entries : [];
 }
 
+/**
+ * Expand the target list into files.
+ *
+ * A directory is walked for `.lua`/`.luau` files instead of being handed to
+ * `readFileSync`, which fails with EISDIR. That matters here because the
+ * project modules live in five folders with `&` and spaces in their names: a
+ * shell glob for them is painful to write correctly, `analyze src/project` is
+ * not.
+ */
 export function sourceFiles(patterns) {
-    if (patterns.length > 0) return patterns.map((pattern) => resolve(pattern));
+    if (patterns.length > 0) {
+        const files = [];
+        for (const pattern of patterns) {
+            const path = resolve(pattern);
+            if (existsSync(path) && statSync(path).isDirectory()) {
+                const found = readdirSync(path, { recursive: true })
+                    .filter((entry) => /\.luau?$/.test(entry))
+                    .map((entry) => resolve(path, entry))
+                    .sort();
+                files.push(...found);
+            } else {
+                files.push(path);
+            }
+        }
+        return files;
+    }
     return DEFAULT_TARGETS.filter((target) => existsSync(resolve(ROOT, target))).map((target) =>
         resolve(ROOT, target),
     );

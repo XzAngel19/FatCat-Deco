@@ -112,6 +112,14 @@ if [ -f src/FatCatHub.lua ]; then
         echo "no project modules found under src/project" >&2
         exit 1
     fi
+    # A module body that reads a dependency gets nil at boot, and the analyzer
+    # cannot see it: the name is declared, just not assigned yet. This checks
+    # the rule directly, before anything is assembled.
+    python3 tools/lint_module_body.py >build/fatchub.modulebody.log 2>&1 || {
+        cat build/fatchub.modulebody.log
+        exit 1
+    }
+    grep -E "^PASS" build/fatchub.modulebody.log
     "$LUAU_COMPILE" src/FatCatHub.lua src/FatCatHub.loader.lua src/FatCatHub.project.lua \
         "${project_files[@]}" >/dev/null
     node tools/luau/analyze.mjs --quiet src/FatCatHub.lua src/FatCatHub.loader.lua \
