@@ -284,6 +284,51 @@ do
 	check("Signal:Destroy releases a parked Wait", resumed == true)
 end
 
+-- ---------------------------------------------------------------------------
+-- Layout order stays unique
+--
+-- `#parent:GetChildren() + 1` gives a new row an order a surviving row still
+-- holds after a removal, and SortOrder.LayoutOrder then draws them in an
+-- undefined order. The counter must never repeat.
+-- ---------------------------------------------------------------------------
+do
+	local Materials = Core:Require("FatCatMaterials")
+	local host = Instance.new("Frame")
+	host.Name = "OrderHost"
+	host.Size = UDim2.fromOffset(300, 400)
+	-- Section returns { frame, setters, values, Register }; children go in the
+	-- box, not in the binding table.
+	local box = Materials.Section(host, "Order").frame
+	-- Materials returns a handle ({ Instance, Set, Get, Destroy }); the row is
+	-- handle.Instance.
+	local first = Materials.Label(box, "one").Instance
+	local second = Materials.Label(box, "two").Instance
+	local third = Materials.Label(box, "three").Instance
+	check("layout order is assigned",
+		first.LayoutOrder ~= nil and second.LayoutOrder ~= nil and first.LayoutOrder < second.LayoutOrder,
+		tostring(first.LayoutOrder) .. "," .. tostring(second.LayoutOrder))
+	-- Remove a row from the middle, then add another: the old
+	-- `#parent:GetChildren() + 1` formula would hand out an order that `third`
+	-- already holds.
+	second:Destroy()
+	local fourth = Materials.Label(box, "four").Instance
+	check("layout order does not collide after a removal",
+		fourth.LayoutOrder ~= third.LayoutOrder and fourth.LayoutOrder > third.LayoutOrder,
+		tostring(fourth.LayoutOrder) .. " vs " .. tostring(third.LayoutOrder))
+	local orders, clash = {}, nil
+	for _, child in box:GetChildren() do
+		local order = child.LayoutOrder
+		if order ~= nil then
+			if orders[order] then
+				clash = tostring(order)
+			end
+			orders[order] = true
+		end
+	end
+	check("no two siblings share a layout order", clash == nil, clash)
+	host:Destroy()
+end
+
 -- ===========================================================================
 -- Teardown
 -- ===========================================================================

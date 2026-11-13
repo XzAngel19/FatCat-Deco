@@ -23,6 +23,21 @@
 local Core, Design, Materials
 Materials = {}
 
+-- A monotonic layout counter per parent.
+--
+-- `#parent:GetChildren() + 1` looks equivalent and is not: remove a row from
+-- the middle and add another, and the new one gets an order a surviving row
+-- already holds. With SortOrder.LayoutOrder that makes the visual order
+-- depends on insertion luck, which is how a re-populated section ends up
+-- shuffled. The counter only ever grows, so every child has a distinct slot.
+local orderCounters = setmetatable({}, { __mode = "k" })
+
+local function nextOrder(parent)
+	local count = (orderCounters[parent] or 0) + 1
+	orderCounters[parent] = count
+	return count
+end
+
 local function create(className, properties, parent)
 	local instance = Instance.new(className)
 	for key, value in properties or {} do
@@ -124,7 +139,7 @@ function Materials.Section(parent, title, height)
 		BackgroundColor3 = Design.color("section"),
 		BackgroundTransparency = 0.25,
 		BorderSizePixel = 0,
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(box, Design.radius.card)
 	create("UIPadding", {
@@ -189,7 +204,7 @@ function Materials.Button(parent, options)
 		BackgroundTransparency = options.Danger and 0.55 or 0.15,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, height),
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(button, Design.radius.field)
 	local border = stroke(button)
@@ -254,7 +269,7 @@ function Materials.Toggle(parent, options)
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, height),
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(card, Design.radius.field)
 	-- The border exists so the row reads as a control at rest; the hover
@@ -367,7 +382,7 @@ function Materials.Slider(parent, options)
 		BackgroundColor3 = Design.color("card"),
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(holder, Design.radius.field)
 	stroke(holder)
@@ -522,7 +537,7 @@ function Materials.Dropdown(parent, options)
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 32),
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(holder, Design.radius.field)
 	stroke(holder)
@@ -632,7 +647,7 @@ function Materials.Input(parent, options)
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 50),
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(card, Design.radius.field)
 	stroke(card)
@@ -692,7 +707,7 @@ function Materials.Status(parent, text, state)
 	local row = create("Frame", {
 		Size = UDim2.new(1, 0, 0, 20),
 		BackgroundTransparency = 1,
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	local colors = {
 		on = Design.color("positive"),
@@ -724,7 +739,7 @@ function Materials.Label(parent, text)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	local cap = create("TextLabel", {
 		Text = tostring(text),
@@ -750,7 +765,7 @@ function Materials.Divider(parent)
 	local holder = create("Frame", {
 		Size = UDim2.new(1, 0, 0, 9),
 		BackgroundTransparency = 1,
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	local line = create("Frame", {
 		Size = UDim2.new(1, -12, 0, 1),
@@ -771,7 +786,7 @@ function Materials.Code(parent, options)
 		BackgroundTransparency = 0.1,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, options.Height or 140),
-		LayoutOrder = #parent:GetChildren() + 1,
+		LayoutOrder = nextOrder(parent),
 	}, parent)
 	corner(card, Design.radius.field)
 	stroke(card, Design.color("outline"), 0.6)

@@ -1139,7 +1139,7 @@ do
 				backgroundBottom = Color3.fromRGB(12, 12, 14),
 				card = Color3.fromRGB(38, 38, 43),
 				cardHover = Color3.fromRGB(47, 47, 53),
-				element = Color3.fromRGB(19, 19, 22),
+				element = Color3.fromRGB(18, 18, 20),
 				elementHover = Color3.fromRGB(45, 45, 51),
 				chip = Color3.fromRGB(28, 28, 32),
 				section = Color3.fromRGB(17, 17, 20),
@@ -1158,7 +1158,7 @@ do
 				backgroundBottom = Color3.fromRGB(12, 12, 14),
 				card = Color3.fromRGB(38, 38, 43),
 				cardHover = Color3.fromRGB(47, 47, 53),
-				element = Color3.fromRGB(19, 19, 22),
+				element = Color3.fromRGB(18, 18, 20),
 				elementHover = Color3.fromRGB(45, 45, 51),
 				chip = Color3.fromRGB(28, 28, 32),
 				section = Color3.fromRGB(17, 17, 20),
@@ -1434,6 +1434,21 @@ do
 		local Core, Design, Materials
 		Materials = {}
 
+		-- A monotonic layout counter per parent.
+		--
+		-- `#parent:GetChildren() + 1` looks equivalent and is not: remove a row from
+		-- the middle and add another, and the new one gets an order a surviving row
+		-- already holds. With SortOrder.LayoutOrder that makes the visual order
+		-- depends on insertion luck, which is how a re-populated section ends up
+		-- shuffled. The counter only ever grows, so every child has a distinct slot.
+		local orderCounters = setmetatable({}, { __mode = "k" })
+
+		local function nextOrder(parent)
+			local count = (orderCounters[parent] or 0) + 1
+			orderCounters[parent] = count
+			return count
+		end
+
 		local function create(className, properties, parent)
 			local instance = Instance.new(className)
 			for key, value in properties or {} do
@@ -1535,7 +1550,7 @@ do
 				BackgroundColor3 = Design.color("section"),
 				BackgroundTransparency = 0.25,
 				BorderSizePixel = 0,
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(box, Design.radius.card)
 			create("UIPadding", {
@@ -1600,7 +1615,7 @@ do
 				BackgroundTransparency = options.Danger and 0.55 or 0.15,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, height),
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(button, Design.radius.field)
 			local border = stroke(button)
@@ -1665,7 +1680,7 @@ do
 				BackgroundTransparency = 0.15,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, height),
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(card, Design.radius.field)
 			-- The border exists so the row reads as a control at rest; the hover
@@ -1778,7 +1793,7 @@ do
 				BackgroundColor3 = Design.color("card"),
 				BackgroundTransparency = 0.15,
 				BorderSizePixel = 0,
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(holder, Design.radius.field)
 			stroke(holder)
@@ -1933,7 +1948,7 @@ do
 				BackgroundTransparency = 0.15,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, 32),
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(holder, Design.radius.field)
 			stroke(holder)
@@ -2043,7 +2058,7 @@ do
 				BackgroundTransparency = 0.15,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, 50),
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(card, Design.radius.field)
 			stroke(card)
@@ -2103,7 +2118,7 @@ do
 			local row = create("Frame", {
 				Size = UDim2.new(1, 0, 0, 20),
 				BackgroundTransparency = 1,
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			local colors = {
 				on = Design.color("positive"),
@@ -2135,7 +2150,7 @@ do
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			local cap = create("TextLabel", {
 				Text = tostring(text),
@@ -2161,7 +2176,7 @@ do
 			local holder = create("Frame", {
 				Size = UDim2.new(1, 0, 0, 9),
 				BackgroundTransparency = 1,
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			local line = create("Frame", {
 				Size = UDim2.new(1, -12, 0, 1),
@@ -2182,7 +2197,7 @@ do
 				BackgroundTransparency = 0.1,
 				BorderSizePixel = 0,
 				Size = UDim2.new(1, 0, 0, options.Height or 140),
-				LayoutOrder = #parent:GetChildren() + 1,
+				LayoutOrder = nextOrder(parent),
 			}, parent)
 			corner(card, Design.radius.field)
 			stroke(card, Design.color("outline"), 0.6)
@@ -6991,12 +7006,18 @@ do
 		-- Build
 		-- ==========================================================================
 
-		function Menu.build()
+		---Build the menu over the shell.
+		---`options.plain` is the fallback the bootstrapper retries with when the first
+		---build throws: it keeps the shell, Home and Settings, and skips the module
+		---tabs, because a module is the likeliest thing to be broken and the least
+		---essential to opening the window at all.
+		function Menu.build(options)
+			options = options or {}
 			local base = shell()
 			if not base then
 				return false, "el shell Fat Cat no está cargado"
 			end
-			if built then
+			if built and not options.plain then
 				base:EnsureBuilt()
 				return true
 			end
@@ -7011,9 +7032,12 @@ do
 			base._initOptions = base._initOptions or {}
 			base._initOptions.Tabs = { Menu.TABS[1][1] }
 
-			base:Mount(function(_activeHub, window)
+			local mounted, mountError = pcall(base.Mount, base, function(_activeHub, window)
 				buildHome(window)
 				buildSettings(window)
+				if options.plain then
+					return
+				end
 				for _, entry in Menu.TABS do
 					local name, modulePath = entry[1], entry[2]
 					if modulePath then
@@ -7025,11 +7049,19 @@ do
 						end
 					end
 				end
-				-- Adding a tab selects it, so the last one added would otherwise be
-				-- what the user sees first. Home is the intended landing page.
-				window:SelectTab("Home")
 			end)
 
+			if not mounted then
+				-- Leave the flag down so the retry can actually rebuild.
+				built = false
+				return false, tostring(mountError)
+			end
+
+			-- Adding a tab selects it, so the last one added would otherwise be what
+			-- the user sees first. Home is the intended landing page.
+			if base._window and base._window.pages["Home"] then
+				base._window:SelectTab("Home")
+			end
 			return true
 		end
 
@@ -7166,7 +7198,10 @@ do
 				backgroundBottom = Color3.fromRGB(12, 12, 14),
 				card = Color3.fromRGB(38, 38, 43),
 				cardHover = Color3.fromRGB(47, 47, 53),
-				element = Color3.fromRGB(19, 19, 22),
+				-- The darkest surface in the menu: fields, checkboxes, tracks.
+				-- Stayed at 19,19,22 through the first pass; 18,18,20 is the
+				-- requested neutral and keeps 16.4:1 against body text.
+				element = Color3.fromRGB(18, 18, 20),
 				elementHover = Color3.fromRGB(45, 45, 51),
 				chip = Color3.fromRGB(28, 28, 32),
 				section = Color3.fromRGB(17, 17, 20),
@@ -7315,20 +7350,28 @@ do
 				local position = target.Position
 				local x = position.X.Offset
 				local y = position.Y.Offset
-				local minX = -size.X + 64
-				local maxX = viewport.X - 64
+
+				-- Keep at least a title-bar-wide strip on screen, and never push the
+				-- left edge past the left of the viewport: the old `-size.X + 64`
+				-- allowed the whole window to sit off the left edge, which on a phone
+				-- in portrait is the entire menu.
+				local grip = math.min(96, size.X)
+				local minX = math.min(0, viewport.X - grip)
+				local maxX = math.max(0, viewport.X - grip)
 				local minY = 0
-				local maxY = viewport.Y - CONFIG.titleHeight
-				if x < minX then
-					x = minX
-				elseif x > maxX then
-					x = maxX
+				local maxY = math.max(0, viewport.Y - CONFIG.titleHeight)
+				x = math.clamp(x, minX, maxX)
+				y = math.clamp(y, minY, maxY)
+
+				-- On a viewport narrower than the window, shrink to fit rather than
+				-- hanging off the side. The minimum is the resize floor, so the
+				-- content stays usable instead of collapsing to nothing.
+				if size.X > viewport.X and viewport.X > 0 then
+					local width = math.max(CONFIG.minWidth, math.min(viewport.X - 16, size.X))
+					target.Size = UDim2.fromOffset(width, math.min(size.Y, math.max(CONFIG.minHeight, viewport.Y - 16)))
+					x = math.min(x, math.max(0, viewport.X - width))
 				end
-				if y < minY then
-					y = minY
-				elseif y > maxY then
-					y = maxY
-				end
+
 				target.Position = UDim2.new(0, x, 0, y)
 			end
 
@@ -8029,17 +8072,27 @@ do
 					TextTruncate = Enum.TextTruncate.AtEnd,
 				}, card)
 
+				-- Left-aligned with the label above it and padded off the stroke. The
+				-- text used to be centred in a box that spans the whole card, which
+				-- made the value look detached from its own row and pushed wide
+				-- options into the border.
 				local button = create("TextButton", {
 					Size = UDim2.new(1, -22, 0, 24),
 					Position = UDim2.fromOffset(11, 28),
 					BackgroundColor3 = THEME.element,
 					BorderSizePixel = 0,
-					Text = default,
+					Text = tostring(default),
 					TextColor3 = THEME.textOff,
 					TextSize = 12,
 					Font = FONT,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
 					AutoButtonColor = false,
 				}, card)
+				create("UIPadding", {
+					PaddingLeft = UDim.new(0, 8),
+					PaddingRight = UDim.new(0, 22),
+				}, button)
 				round(button, 5)
 				local buttonStroke = create("UIStroke", {
 					Color = THEME.outline,
@@ -8120,27 +8173,47 @@ do
 					TextTruncate = Enum.TextTruncate.AtEnd,
 				}, card)
 
+				-- One caret, not two. The text used to end in "      v" AND carry a
+				-- 6x6 unrotated frame on top of it, which read as a stray square
+				-- floating over the value.
 				local button = create("TextButton", {
 					Size = UDim2.new(1, -22, 0, 24),
 					Position = UDim2.fromOffset(11, 28),
 					BackgroundColor3 = THEME.element,
 					BorderSizePixel = 0,
-					Text = "  " .. tostring(default) .. "      v",
+					Text = tostring(default),
 					TextColor3 = THEME.textOff,
 					TextSize = 12,
 					Font = FONT,
 					AutoButtonColor = false,
 					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
 					ClipsDescendants = true,
 				}, card)
 				round(button, 5)
-				local arrow = create("Frame", {
+				-- Padding lives on the button so the value clears both the stroke and
+				-- the caret without counting spaces in a string.
+				create("UIPadding", {
+					PaddingLeft = UDim.new(0, 8),
+					PaddingRight = UDim.new(0, 22),
+				}, button)
+				-- The caret is a glyph, not a rotated frame. A rotated square is the
+				-- obvious way to draw one, but it depends on parent ClipsDescendants
+				-- and on Rotation actually being honoured - and this button clips, so
+				-- half the diamond disappeared. A text glyph has neither problem, and
+				-- the renderer can draw it, which is what makes it verifiable.
+				local arrow = create("TextLabel", {
 					AnchorPoint = Vector2.new(1, 0.5),
-					Size = UDim2.fromOffset(6, 6),
-					Position = UDim2.new(1, -11, 0.5, 0),
-					BackgroundColor3 = THEME.textDim,
-					BorderSizePixel = 0,
-					Rotation = 0,
+					Size = UDim2.fromOffset(16, 24),
+					Position = UDim2.new(1, -2, 0.5, 0),
+					BackgroundTransparency = 1,
+					Text = "\u{25BE}",
+					TextColor3 = THEME.textDim,
+					TextSize = 12,
+					Font = FONT,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 2,
 				}, button)
 
 				local scroll = create("ScrollingFrame", {
@@ -8170,7 +8243,7 @@ do
 					expanded = false
 					scroll.Visible = false
 					tween(card, ANIM.fast, { Size = UDim2.new(1, 0, 0, 56) })
-					retween(arrow, ANIM.fast, { Rotation = 0 })
+					retween(arrow, ANIM.fast, { TextColor3 = THEME.textDim })
 				end
 
 				for index, option in list do
@@ -8235,7 +8308,9 @@ do
 					expanded = not expanded
 					scroll.Visible = expanded
 					tween(card, ANIM.fast, { Size = UDim2.new(1, 0, 0, expanded and openHeight or 56) })
-					retween(arrow, ANIM.fast, { Rotation = expanded and 180 or 0 })
+					-- Brighter while open: the caret is the state indicator, and
+					-- a glyph cannot be turned into its own inverse for free.
+					retween(arrow, ANIM.fast, { TextColor3 = expanded and THEME.text or THEME.textDim })
 				end)
 
 				table.insert(Hub.Searchables, card)
@@ -9036,9 +9111,35 @@ do
 			---Hub-level convenience: the loader and game modules call Hub:Toggle()
 			---rather than reaching into Hub._window.
 			function Hub:Toggle()
-				if Hub._window then
-					Hub._window:Toggle()
+				-- Rebuild on demand: the GUI can be gone (a game cleaned CoreGui, a
+				-- respawn with ResetOnSpawn, a Destroy) while the hotkey is still
+				-- armed. Without this the key looks dead because it has nothing to
+				-- show.
+				if not Hub._window or not Hub._screen or Hub._screen.Parent == nil then
+					Hub:Init(Hub._initOptions)
+					if Hub._window then
+						Hub._window:Show()
+					end
+					return
 				end
+				Hub._window:Toggle()
+			end
+
+			---True when the window is on screen.
+			function Hub:IsOpen()
+				return Hub._window ~= nil and Hub._window:IsOpen()
+			end
+
+			---Hide without destroying; the hotkey brings it back.
+			function Hub:Hide()
+				if Hub._window then
+					Hub._window:Hide()
+				end
+			end
+
+			---Show, rebuilding if the window is gone.
+			function Hub:Show()
+				Hub:Toggle()
 			end
 
 			function Hub:Minimize()
@@ -9088,13 +9189,21 @@ do
 					TextColor3 = THEME.textDim,
 					TextSize = TEXT_SIZE.tab,
 					Font = FONT_MEDIUM,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
 					AutoButtonColor = false,
 				}, self.tabBar)
+				-- Left-aligned with the same 14 px gutter as the title and the cards.
+				-- Centred, a single tab reads as a button, not as navigation.
+				create("UIPadding", { PaddingLeft = UDim.new(0, 8) }, button)
 
+				-- A short dash under the first letters, not a bar across the whole
+				-- slot: with left-aligned labels the old centred bar pointed at
+				-- nothing and grew wider as tabs were added.
 				local underline = create("Frame", {
-					AnchorPoint = Vector2.new(0.5, 1),
-					Size = UDim2.new(0.42, 0, 0, 2),
-					Position = UDim2.fromScale(0.5, 1),
+					AnchorPoint = Vector2.new(0, 1),
+					Size = UDim2.new(0, 18, 0, 2),
+					Position = UDim2.new(0, 8, 1, 0),
 					BackgroundColor3 = Color3.new(1, 1, 1),
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
@@ -9136,11 +9245,28 @@ do
 			---Minimise or restore the window body.
 			function Window:ToggleMinimize()
 				self.minimized = not self.minimized
-				self.resizeHandle.Visible = not self.minimized
+				-- The title bar, the tab strip and the hint row stay exactly where
+				-- they are: only the body collapses, so the bar cannot reflow and the
+				-- buttons cannot drift.
 				self.body.Visible = not self.minimized
+				self.resizeHandle.Visible = not self.minimized
+				self:ClampMinimize()
 				tween(self.frame, ANIM.medium, {
 					Size = UDim2.fromOffset(self.width, self.minimized and CONFIG.titleHeight or self.height),
 				})
+				if self.minimized then
+					task.defer(clampToViewport, self.frame)
+				end
+			end
+
+			---Re-apply the collapsed/expanded height without animating. Used after a
+			---resize, so dragging the handle while minimised does not leave the body
+			---offscreen.
+			function Window:ClampMinimize()
+				if not self.minimized then
+					return
+				end
+				self.frame.Size = UDim2.fromOffset(self.width, CONFIG.titleHeight)
 			end
 
 			---Restore the default size and centre the window.
@@ -9155,17 +9281,46 @@ do
 				})
 			end
 
+			---Show the window again, rebuilding if it was never built.
+			---`Enabled` on the ScreenGui (not `Visible` on the frame) so hiding keeps
+			---every widget alive: values, scroll position and focus all survive.
+			function Window:Show()
+				if self.screen then
+					self.screen.Enabled = true
+				end
+				if not self.frame.Visible then
+					self.frame.Visible = true
+				end
+				local scale = self.frame:FindFirstChildOfClass("UIScale")
+				if scale then
+					scale.Scale = 0.94
+					retween(scale, ANIM.pop, { Scale = 1 })
+				end
+				task.defer(clampToViewport, self.frame)
+			end
+
+			---Hide the window without destroying anything.
+			function Window:Hide()
+				if self.screen then
+					self.screen.Enabled = false
+				else
+					self.frame.Visible = false
+				end
+			end
+
+			---True when the window is on screen.
+			function Window:IsOpen()
+				if self.screen then
+					return self.screen.Enabled
+				end
+				return self.frame.Visible
+			end
+
 			function Window:Toggle()
-				self.frame.Visible = not self.frame.Visible
-				if self.frame.Visible then
-					local scale = self.frame:FindFirstChildOfClass("UIScale")
-					if scale then
-						scale.Scale = 0.94
-						retween(scale, ANIM.pop, { Scale = 1 })
-					end
-					-- Re-clamp every open: a resolution change while hidden can strand
-					-- the window off screen.
-					task.defer(clampToViewport, self.frame)
+				if self:IsOpen() then
+					self:Hide()
+				else
+					self:Show()
 				end
 			end
 
@@ -9173,18 +9328,154 @@ do
 			-- Build the window
 			-- ======================================================================
 
+			---Where the ScreenGui should live, in order of preference.
+			---CoreGui first (hidden from PlayerGui scans), then PlayerGui, then the
+			---executor's hidden UI container, then nothing at all so the GUI still
+			---builds and the caller can re-parent it.
+			---
+			---Every candidate is *checked*, not assumed: `FindFirstChild` returning a
+			---non-Instance (a mock service, a stale reference) used to leave the
+			---ScreenGui unparented, and an unparented ScreenGui renders nothing, so
+			---the menu looked like it had failed to open.
+			local function guiContainer()
+				local candidates = {}
+
+				-- CoreGui: the normal home, and the one that survives a respawn.
+				local okCore, coreGui = pcall(function()
+					return game:GetService("CoreGui")
+				end)
+				if okCore and typeof(coreGui) == "Instance" then
+					table.insert(candidates, coreGui)
+				end
+
+				-- PlayerGui: the documented fallback when CoreGui is out of reach.
+				local okPlayer, playerGui = pcall(function()
+					local player = localPlayer
+					if not player then
+						local okPlayers, players = pcall(function()
+							return game:GetService("Players")
+						end)
+						if okPlayers then
+							player = players.LocalPlayer
+						end
+					end
+					if player then
+						local gui = player:FindFirstChild("PlayerGui")
+						if gui then
+							return gui
+						end
+					end
+					return nil
+				end)
+				if okPlayer and typeof(playerGui) == "Instance" then
+					table.insert(candidates, playerGui)
+				end
+
+				-- gethui(): an executor's own hidden container, when there is one.
+				if typeof(gethui) == "function" then
+					local okHidden, hidden = pcall(gethui)
+					if okHidden and typeof(hidden) == "Instance" then
+						table.insert(candidates, hidden)
+					end
+				end
+
+				-- The first candidate is the tree root by design (CoreGui has no
+				-- parent), so "has a parent" is not the test. What matters is that
+				-- the candidate really is an Instance we can parent to; the caller
+				-- re-checks after parenting, which is the only proof that counts.
+				return candidates[1]
+			end
+
+			-- ======================================================================
+			-- Global hotkeys
+			-- ======================================================================
+			-- Bound once, for the life of the hub, and NOT inside buildWindow(). The
+			-- listener used to live on the ScreenGui's lifetime, so destroying the GUI
+			-- - which the old "X" did - disconnected it and killed the keybind. It now
+			-- survives a rebuild, a hide and the close button.
+			--
+			-- The handler reads Hub._window on every press instead of closing over the
+			-- window it was built with: a rebuild replaces that table, and a captured
+			-- one would toggle a frame that is no longer on screen.
+			local function onKeyDown(input, gameProcessed)
+			if input.UserInputType ~= Enum.UserInputType.Keyboard then
+				return
+			end
+
+				local live = Hub._window
+				if not live then
+					return
+				end
+
+			-- Diagnostics first: whatever happens below, the last key the hub
+			-- saw is visible from the console.
+			Hub._lastKey = input.KeyCode
+			Hub._lastKeyProcessed = gameProcessed == true
+			Hub._inputHandler = (Hub._inputHandler or 0) + 1
+
+			-- A keybind chip is waiting for the next key. This runs before the
+			-- gameProcessed check on purpose: while typing a new key into a
+			-- chip, the game is usually eating the keystroke.
+			if Hub._listening then
+				local listener = Hub._listening
+				Hub._listening = nil
+				listener(input.KeyCode)
+				return
+			end
+
+			-- Escape inside the search field clears it and lets go of the
+			-- keyboard. Before the gameProcessed check on purpose again: a
+			-- focused TextBox eats every key, Escape included.
+			if input.KeyCode == Enum.KeyCode.Escape and live.isSearchFocused and live.isSearchFocused() then
+				live.searchBox.Text = ""
+				live.searchBox:ReleaseFocus()
+				return
+			end
+
+			if gameProcessed then
+				-- Only for the keys we own: the user pressed the menu key and
+				-- Roblox handed the event to the game (a chat box, a TextBox).
+				local wanted = matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey)
+					or (matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown())
+				if wanted and not Hub._processedWarned then
+					Hub._processedWarned = true
+					Hub:Notify(
+						"Key taken by the game",
+						"error",
+						("Press %s with the chat closed"):format(input.KeyCode.Name)
+					)
+				end
+				return
+			end
+
+			if matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown() then
+				Hub:SetHintsVisible(not Hub:GetHintsVisible())
+				return
+			end
+
+			if matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey) then
+				-- Go through Hub:Toggle() rather than the closed-over window: a
+				-- rebuild replaces Hub._window, and the old frame would be dead.
+				Hub:Toggle()
+				return
+			end
+
+			-- Route the press to whichever keybind owns it.
+			for _, entry in Hub._entries do
+				if entry.HandleKey and entry.HandleKey(input.KeyCode) then
+					return
+				end
+			end	end
+
+			-- Kept on the hub so a test can fire a synthetic press, and so a rebuild
+			-- can replace the window without re-binding anything.
+			Hub._hotkeyConnection = userInputService.InputBegan:Connect(onKeyDown)
+			Hub._onKeyDown = onKeyDown
+
 			---Rebuild the whole interface. Called once by the loader and again by
 			---Hub:Rebuild() when the tab list changes.
 			local function buildWindow()
-				-- Prefer the hidden GUI container when the executor provides one: some
-				-- games' anticheat only skims PlayerGui.
-				local guiParent = localPlayer and localPlayer:FindFirstChild("PlayerGui") or nil
-				if typeof(gethui) == "function" then
-					local ok, hidden = pcall(gethui)
-					if ok and hidden then
-						guiParent = hidden
-					end
-				end
+				local guiParent = guiContainer()
 
 				local screen = create("ScreenGui", {
 					Name = "FatCatHub",
@@ -9194,6 +9485,23 @@ do
 					ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 				}, guiParent)
 				Hub._screen = screen
+
+				-- If the preferred parent refused the child (a locked CoreGui rejects
+				-- it silently), fall back to PlayerGui rather than rendering nothing.
+				if screen.Parent == nil then
+					local fallback = localPlayer and localPlayer:FindFirstChildOfClass("PlayerGui")
+					if fallback == nil and localPlayer then
+						local okGui, gui = pcall(function()
+							return localPlayer:FindFirstChild("PlayerGui")
+						end)
+						if okGui then
+							fallback = gui
+						end
+					end
+					if fallback then
+						screen.Parent = fallback
+					end
+				end
 
 				-- Every global listener dies with the GUI.
 				connect(screen.Destroying, function()
@@ -9479,6 +9787,8 @@ do
 				-- thin and off-centre next to each other at this size.
 				local minimizeButton = titleButton("–", -62, THEME.accentAlt)
 				local closeButton = titleButton("×", -32, THEME.negative)
+				window.minimizeButton = minimizeButton
+				window.closeButton = closeButton
 
 				-- ------------------------------------------------------------ drag
 				local dragStart, startPosition
@@ -9516,10 +9826,12 @@ do
 				minimizeButton.Activated:Connect(function()
 					window:ToggleMinimize()
 				end)
+				-- Hide, never destroy. Destroying the ScreenGui also fires its
+				-- Destroying handler, which disconnects every global listener -
+				-- the menu key among them - so the old "X" made the hotkey look
+				-- broken until the hub was reloaded.
 				closeButton.Activated:Connect(function()
-					tween(windowScale, ANIM.fast, { Scale = 0 }).Completed:Connect(function()
-						screen:Destroy()
-					end)
+					window:Hide()
 				end)
 
 				-- ------------------------------------------------------------- tabs
@@ -9592,7 +9904,14 @@ do
 					local delta = input.Position - resizeStart
 					window.width = math.clamp(startWidth + delta.X, CONFIG.minWidth, CONFIG.maxWidth)
 					window.height = math.clamp(startHeight + delta.Y, CONFIG.minHeight, CONFIG.maxHeight)
-					frame.Size = UDim2.fromOffset(window.width, window.height)
+					-- While minimised the body is hidden, so keep the frame at the
+					-- title height and only remember the new width. Otherwise the
+					-- next expand jumps to a size the user never saw take effect.
+					if window.minimized then
+						window:ClampMinimize()
+					else
+						frame.Size = UDim2.fromOffset(window.width, window.height)
+					end
 				end)
 				connect(userInputService.InputEnded, function(input)
 					if not resizing or not isPress(input) then
@@ -9684,71 +10003,6 @@ do
 					return hintsVisible
 				end
 
-				connect(userInputService.InputBegan, function(input, gameProcessed)
-					if input.UserInputType ~= Enum.UserInputType.Keyboard then
-						return
-					end
-
-					-- Diagnostics first: whatever happens below, the last key the hub
-					-- saw is visible from the console.
-					Hub._lastKey = input.KeyCode
-					Hub._lastKeyProcessed = gameProcessed == true
-					Hub._inputHandler = (Hub._inputHandler or 0) + 1
-
-					-- A keybind chip is waiting for the next key. This runs before the
-					-- gameProcessed check on purpose: while typing a new key into a
-					-- chip, the game is usually eating the keystroke.
-					if Hub._listening then
-						local listener = Hub._listening
-						Hub._listening = nil
-						listener(input.KeyCode)
-						return
-					end
-
-					-- Escape inside the search field clears it and lets go of the
-					-- keyboard. Before the gameProcessed check on purpose again: a
-					-- focused TextBox eats every key, Escape included.
-					if input.KeyCode == Enum.KeyCode.Escape and window.isSearchFocused and window.isSearchFocused() then
-						window.searchBox.Text = ""
-						window.searchBox:ReleaseFocus()
-						return
-					end
-
-					if gameProcessed then
-						-- Only for the keys we own: the user pressed the menu key and
-						-- Roblox handed the event to the game (a chat box, a TextBox).
-						local wanted = matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey)
-							or (matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown())
-						if wanted and not Hub._processedWarned then
-							Hub._processedWarned = true
-							Hub:Notify(
-								"Key taken by the game",
-								"error",
-								("Press %s with the chat closed"):format(input.KeyCode.Name)
-							)
-						end
-						return
-					end
-
-					if matchesKey(input.KeyCode, CONFIG.hintsKeys) and isAnyControlDown() then
-						Hub:SetHintsVisible(not Hub:GetHintsVisible())
-						return
-					end
-
-					if matchesKey(input.KeyCode, Hub.menuKey or CONFIG.menuKey) then
-						-- Go through Hub:Toggle() rather than the closed-over window: a
-						-- rebuild replaces Hub._window, and the old frame would be dead.
-						Hub:Toggle()
-						return
-					end
-
-					-- Route the press to whichever keybind owns it.
-					for _, entry in Hub._entries do
-						if entry.HandleKey and entry.HandleKey(input.KeyCode) then
-							return
-						end
-					end
-				end)
 
 				-- Keep the window inside the viewport when the game window resizes.
 				if workspace.CurrentCamera then
@@ -9859,6 +10113,14 @@ do
 
 			---Destroy the GUI and every listener.
 			function Hub:Destroy()
+				-- The hotkey is deliberately outside Hub.Connections (it outlives a
+				-- screen), so it has to be released by hand here.
+				if Hub._hotkeyConnection then
+					pcall(function()
+						Hub._hotkeyConnection:Disconnect()
+					end)
+					Hub._hotkeyConnection = nil
+				end
 				if Hub._screen then
 					Hub._screen:Destroy()
 				end
@@ -10304,15 +10566,31 @@ local InitFactory = (function()
 			_G.FatCatProject = Core
 
 			-- 3. The rest of the core modules, in dependency order.
+			--
+			-- Which of these may fail without taking the menu down: everything
+			-- except the two the shell itself is built on. FatCatEnv supplies the
+			-- executor surface, FatCatSignal is already loaded, and the shell
+			-- needs nothing else to open. A broken palette (Design) or a broken
+			-- widget kit (Materials) degrades the look and the project tabs, but
+			-- the window the user opens with RightShift still comes up, which is
+			-- the whole point of a client that is supposed to stay usable.
+			local OPTIONAL = {
+				FatCatConfig = "presets and saved values",
+				FatCatDesign = "palettes and typography",
+				FatCatMaterials = "the project's widget kit",
+				FatCatMath = "trajectories and prediction",
+			}
 			for _, name in { "FatCatEnv", "FatCatConfig", "FatCatDesign", "FatCatMaterials", "FatCatMath" } do
 				Init.STAGE = name
 				local module, why = factory(name)
 				if module == nil then
-					if name == "FatCatMath" then
-						-- Math is used by two features, not by the core; a failure
-						-- here costs the trajectory tools, not the menu.
+					if OPTIONAL[name] then
+						-- Recorded, logged, and surfaced in the report: degraded,
+						-- not silent. `why` already names the module and the
+						-- error, so the card is readable.
 						failures[name] = tostring(why)
-						Core:Log("warn", why)
+						Core:Log("warn", ("[Fat Cat] %s no cargó (%s); sigo sin ello"):format(name, OPTIONAL[name]))
+						Core:Log("warn", tostring(why))
 					else
 						return fail(name, why)
 					end
@@ -10378,15 +10656,30 @@ local InitFactory = (function()
 
 			-- 6. The menu. This is the first step that draws anything, so every
 			--    prior failure is visible in the log before the window exists.
+			--
+			-- Two chances, because they fail for different reasons: the first
+			-- build uses the project's palette and widget kit, the second drops
+			-- to the shell's own theme. If the project layer is what broke, the
+			-- menu still opens instead of showing an error card over a black
+			-- screen.
 			Init.STAGE = "FatCatMenu"
 			local menu, menuWhy = Core:TryRequire("FatCatMenu")
 			if not menu then
 				return fail("FatCatMenu", menuWhy)
 			end
 
-			local built, buildWhy = menu.build()
-			if not built then
-				return fail("FatCatMenu.build", buildWhy)
+			-- build() reports (false, why) instead of throwing, so both shapes are
+			-- handled: a throw and a refusal are the same thing to the user.
+			local called, built, buildWhy = pcall(menu.build)
+			if not called or not built then
+				local reason = called and buildWhy or built
+				Core:Log("warn", "[Fat Cat] la primera construcción del menú falló, reintento sin tema")
+				Core:Log("warn", tostring(reason))
+				failures.FatCatMenu = tostring(reason)
+				local retried, retryBuilt, retryWhy = pcall(menu.build, { plain = true })
+				if not retried or not retryBuilt then
+					return fail("FatCatMenu.build", retried and retryWhy or retryBuilt)
+				end
 			end
 
 			-- 7. Unload hook and a final report.

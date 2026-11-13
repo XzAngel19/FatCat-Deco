@@ -23,7 +23,7 @@ tools/fatchub/              harness: mock de Roblox, asserts, render PNG
 docs/FATCAT-HUB.md          esto
 ```
 
-`src/FatCatHub.lua` sigue siendo la ventana y la única parte que los 94 asserts
+`src/FatCatHub.lua` sigue siendo la ventana y la única parte que los 115 asserts
 y la auditoría de diseño miden. El proyecto (los 20 módulos) se monta encima
 vía `Hub:Mount`, así que las dos mitades comparten tabs, toasts, búsqueda y
 teardown en vez de duplicarlos.
@@ -170,15 +170,32 @@ avisan en un toast y no rompen nada.
 
 ```lua
 Hub:Toggle()            -- igual que la tecla del menú
+Hub:Show()              -- mostrar (reconstruye si la GUI ya no está)
+Hub:Hide()              -- ocultar sin destruir nada
+Hub:IsOpen()            -- true si está en pantalla
 Hub:Minimize()
 Hub:SelectTab("Combat")
 Hub:SetAccent(Color3.fromRGB(120, 180, 255))  -- recolorea todos los degradados
 Hub:Notify("Listo", "success", "detalle opcional")
-Hub:Unload()
+Hub:Unload()            -- esto sí destruye: suelta el teclado y el ScreenGui
 ```
 
 Teclas: `RightShift` abre/cierra, `Ctrl+H` muestra u oculta la fila de atajos,
 y cada `Keybind` responde a su tecla.
+
+#### Mostrar, ocultar y destruir son tres cosas distintas
+
+- **Ocultar** (`Hub:Hide()`, el botón `×`, `RightShift`) pone
+  `ScreenGui.Enabled = false`. No destruye nada: los valores, la posición del
+  scroll y el foco del campo de búsqueda siguen ahí al volver.
+- **Destruir** (`Hub:Unload()`, `Hub:Destroy()`) sí suelta todo. Es lo último
+  que se llama, no lo que hace un botón.
+- El botón `×` **nunca** destruye. Antes lo hacía, y como la GUI era la dueña
+  del listener de teclado, cerrar el menú mataba `RightShift` hasta recargar.
+  Ahora el listener vive en el hub, no en la GUI, así que sobrevive a ocultar,
+  a reconstruir y a cerrar.
+- El `–` colapsa el cuerpo y deja la barra de título, las pestañas y la fila de
+  atajos donde estaban: se puede arrastrar y restaurar desde ahí.
 
 ## Qué cambió respecto al original
 
@@ -272,15 +289,15 @@ Para diagnosticar desde la consola: `_G.FatCatHub._lastKey` y
 ```bash
 bash tools/luau/setup.sh            # toolchain (una vez)
 python3 tools/build_bundle.py       # regenera src/FatCatHub.bundle.lua
-bash tools/test_fatchub.sh          # 94 asserts de librería + 16 del proyecto
+bash tools/test_fatchub.sh          # 115 asserts de librería + 16 del proyecto
 bash tools/test_fatchub_loader.sh   # 57 asserts del loader, sin red
-bash tools/test_fatchub_bundle.sh   # 100 asserts sobre el proyecto ensamblado
+bash tools/test_fatchub_bundle.sh   # 137 asserts sobre el proyecto ensamblado
 bash tools/design.sh                # build/FatCatHub.png + auditoría
 bash tools/design.sh --project      # las pestañas del decompiler
 bash tools/validate.sh              # todo lo anterior + el resto del repo
 ```
 
-El arnés del bundle (100 asserts) es el único que corre el bootstrapper de verdad: arranca
+El arnés del bundle (120 asserts, más 17 de un arranque degradado aparte) es el único que corre el bootstrapper de verdad: arranca
 `FatCatInit`, comprueba que ningún módulo falló, que el shell publicó
 `_G.FatCatHub`, que hay exactamente 7 pestañas y ninguna vacía, que un preset
 llega al shell por su flag, y que `Core:Destroy()` deja el global en nil y no

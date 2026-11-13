@@ -296,12 +296,16 @@ flush()
 local connectionCount = #Hub.Connections
 check("global listeners registered", connectionCount >= 4, connectionCount)
 
+-- The window hides through ScreenGui.Enabled, not frame.Visible: that is what
+-- keeps every widget (values, scroll position, focus) alive across a hide.
 local windowFrame = Hub._window.frame
-windowFrame.Visible = true
+Hub._window:Show()
+check("Show leaves the window open", Hub._window:IsOpen() == true)
 Hub._window:Toggle()
-check("menu key hides the window", windowFrame.Visible == false)
+check("menu key hides the window", Hub._window:IsOpen() == false)
 Hub._window:Toggle()
-check("menu key shows the window", windowFrame.Visible == true)
+check("menu key shows the window", Hub._window:IsOpen() == true)
+check("hiding does not destroy the frame", windowFrame.Parent ~= nil)
 
 -- ==========================================================================
 -- Mount: adding the project's own tab after the library has loaded.
@@ -342,24 +346,23 @@ check("cleared builders do not run", mountedRuns == 2, mountedRuns)
 
 local userInput = game:GetService("UserInputService")
 Hub._listening = nil
-local frame = Hub._window.frame
-frame.Visible = true
+Hub._window:Show()
 
 -- RightShift, as configured.
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
-check("right shift closes the window", frame.Visible == false)
+check("right shift closes the window", Hub._window:IsOpen() == false)
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
-check("right shift opens it again", frame.Visible == true)
+check("right shift opens it again", Hub._window:IsOpen() == true)
 
 -- LeftShift too: laptops have no right shift.
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.LeftShift }, false)
-check("left shift also toggles", frame.Visible == false)
+check("left shift also toggles", Hub._window:IsOpen() == false)
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.LeftShift }, false)
 
 -- A key the game already consumed must not toggle the menu.
-local beforeProcessed = frame.Visible
+local beforeProcessed = Hub._window:IsOpen()
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, true)
-check("game-consumed key does not toggle", frame.Visible == beforeProcessed)
+check("game-consumed key does not toggle", Hub._window:IsOpen() == beforeProcessed)
 
 -- Ctrl+H toggles the hint strip; H alone must not.
 local hints = Hub._window.hints
@@ -382,11 +385,90 @@ end
 
 -- After a rebuild the hotkey still has a live window to toggle.
 Hub:Init(Hub._initOptions)
-local rebuiltFrame = Hub._window.frame
-rebuiltFrame.Visible = true
+Hub._window:Show()
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
-check("hotkey works after a rebuild", rebuiltFrame.Visible == false)
+check("hotkey works after a rebuild", Hub._window:IsOpen() == false)
 userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+
+-- ==========================================================================
+-- The close button
+--
+-- The old "X" destroyed the ScreenGui. Its Destroying handler disconnected
+-- every global listener, the menu key included, so the menu could not be
+-- reopened and the hotkey looked broken. Hiding must not do any of that.
+-- ==========================================================================
+
+do
+	local closeButton = Hub._window.closeButton
+	if closeButton then
+		Hub._window:Show()
+		closeButton.Activated:Fire()
+		flush()
+		check("the close button hides the window", Hub._window:IsOpen() == false)
+		check("the close button does not destroy the GUI", Hub._screen ~= nil and Hub._screen.Parent ~= nil)
+		check("the window frame survives the close", Hub._window.frame.Parent ~= nil)
+		check("the close button keeps the hub published", _G.FatCatHub == Hub)
+		userInput.InputBegan:Fire({ UserInputType = Enum.UserInputType.Keyboard, KeyCode = Enum.KeyCode.RightShift }, false)
+		check("the hotkey still opens it after a close", Hub._window:IsOpen() == true)
+	else
+		check("close button found", false, "no × button on the title bar")
+	end
+end
+
+-- --------------------------------------------------------------------------
+-- Minimise: collapse the body, keep the bar, come back to the same size
+-- --------------------------------------------------------------------------
+do
+	local win = Hub._window
+	win.minimized = false
+	win.body.Visible = true
+	local titleY = win.frame.Size.Y.Offset
+	win:ToggleMinimize()
+	check("minimise collapses the body", win.body.Visible == false)
+	check("minimise hides the resize handle", win.resizeHandle.Visible == false)
+	check("minimise keeps the frame at title height", win.frame.Size.Y.Offset < titleY)
+	check("minimise keeps the window open", win:IsOpen() == true)
+	-- The tab strip and hint row belong to the frame, not the body, so they
+	-- must still be there: a collapsed window that loses its bar cannot be
+	-- dragged or restored.
+	check("minimise keeps the tab strip", win.tabBar.Parent ~= nil and win.tabBar.Visible ~= false)
+	win:ToggleMinimize()
+	check("restore brings the body back", win.body.Visible == true)
+	check("restore brings the handle back", win.resizeHandle.Visible == true)
+	check("restore returns to the original height", win.frame.Size.Y.Offset == titleY)
+end
+
+-- --------------------------------------------------------------------------
+-- Scaling: a narrow viewport must not strand the window off screen
+-- --------------------------------------------------------------------------
+do
+	local camera = workspace.CurrentCamera
+	local original = camera.ViewportSize
+	local win = Hub._window
+
+	-- A phone in portrait: narrower than the window's default width.
+	camera.ViewportSize = Vector2.new(390, 780)
+	win.frame.Position = UDim2.new(0, -900, 0, -400)
+	win:Show()
+	flush()
+	local x = win.frame.Position.X.Offset
+	local y = win.frame.Position.Y.Offset
+	check("narrow viewport keeps a grip on screen", x >= 0, tostring(x))
+	check("narrow viewport keeps the top on screen", y >= 0, tostring(y))
+	check("narrow viewport shrinks the window to fit", win.frame.Size.X.Offset <= 390, win.frame.Size.X.Offset)
+	check("narrow viewport keeps the window usable", win.frame.Size.X.Offset >= 380, win.frame.Size.X.Offset)
+
+	-- A very short viewport, like a phone in landscape with a keyboard up.
+	camera.ViewportSize = Vector2.new(1280, 300)
+	win.frame.Position = UDim2.new(0, 0, 0, 5000)
+	win:Show()
+	flush()
+	check("short viewport clamps the top edge", win.frame.Position.Y.Offset <= 300)
+	check("short viewport does not push above the top", win.frame.Position.Y.Offset >= 0)
+
+	camera.ViewportSize = original
+	win:ResetPosition()
+end
 
 Hub:Destroy()
 check("destroy removes the screen", Hub._screen.Parent == nil)

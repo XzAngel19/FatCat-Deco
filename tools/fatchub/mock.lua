@@ -323,7 +323,9 @@ function Instance.new(className)
 		ClassName = className,
 		_children = {},
 		_attributes = {},
-		_props = { Name = className, Visible = true, Text = "" },
+		-- Enabled is a ScreenGui property, and it is true by default: the hub
+		-- hides its GUI with it, because that keeps every widget alive.
+		_props = { Name = className, Visible = true, Text = "", Enabled = true },
 		_parent = nil,
 		Destroyed = false,
 	}
@@ -648,6 +650,12 @@ end
 local playerGui = Instance.new("Folder")
 playerGui.Name = "PlayerGui"
 
+-- CoreGui, the container a ScreenGui normally lives in. Without it the hub's
+-- parent resolver correctly falls back, and a test that means to cover the
+-- CoreGui path would silently cover the fallback instead.
+local coreGui = Instance.new("Folder")
+coreGui.Name = "CoreGui"
+
 local localPlayer = Instance.new("Player")
 localPlayer.Name = "Tester"
 localPlayer.Parent = playerGui
@@ -810,6 +818,8 @@ game = {
 			return httpService
 		elseif name == "TweenService" then
 			return tweenService
+		elseif name == "CoreGui" then
+			return coreGui
 		elseif name == "Workspace" then
 			return { CurrentCamera = camera }
 		elseif name == "RunService" then
@@ -968,13 +978,19 @@ end
 _G.CFrame = CFrame
 Vector3 = Vector3
 
--- typeof() has to name CFrame and Vector3 like Roblox does.
+-- typeof() has to name CFrame and Vector3 like Roblox does - and, just as
+-- important, an Instance has to come back as "Instance". It used to report
+-- "table" for every instance, which quietly broke any code that validates a
+-- service before parenting to it (the hub's ScreenGui container resolver).
 local previousTypeof = typeof
 typeof = function(value)
 	if type(value) == "table" then
 		local meta = getmetatable(value)
 		if meta and meta.__type then
 			return meta.__type
+		end
+		if rawget(value, "ClassName") ~= nil or (meta and meta.__className) then
+			return "Instance"
 		end
 	end
 	return previousTypeof(value)

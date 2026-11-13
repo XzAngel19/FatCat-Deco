@@ -149,6 +149,30 @@ cámara la primera vez que lo toca y lo devuelve en Unload. Un script que deja
 al jugador a walkspeed 500 después de "descargarse" es peor que uno que nunca
 corrió.
 
+## Qué pasa si un módulo falla
+
+El arranque está dividido por etapas y no todas son fatales. La regla es simple:
+**lo que hace falta para abrir una ventana es fatal; lo que solo mejora la
+ventana no lo es.**
+
+| Etapa | Si falla |
+| --- | --- |
+| `FatCatSignal`, `FatCatCore`, `FatCatEnv` | fatal: sin ellos no hay proyecto |
+| `FatCatConfig`, `FatCatDesign`, `FatCatMaterials`, `FatCatMath` | se registra el fallo, se sigue sin ese módulo |
+| `FatCatShell` | fatal: no hay dónde dibujar |
+| `FatCatMenu` | se reintenta una vez sin las pestañas de módulo (`build{ plain = true }`) |
+| cualquier otro módulo | perezoso: se carga al pedirlo, y `TryRequire` devuelve `nil` con el motivo |
+
+Un fallo no es silencioso: entra en `Init.booted.failures`, se escribe con
+`Core:Log("warn", ...)` y queda en el reporte que imprime el loader. Lo que se
+evita es que **tumbe el menú**, no que se sepa.
+
+Eso se comprueba de verdad, no de palabra: `tools/test_fatchub_bundle.sh`
+genera un segundo chunk en el que el factory de `FatCatMaterials` lanza a
+propósito, y exige que el boot llegue a `ready`, que el shell publique la
+ventana, que `Home` exista y que el fallo esté nombrado en el reporte. Con la
+política anterior ese mismo chunk fallaba en cinco asserts y no había ni shell.
+
 ## El contrato de un módulo
 
 Todo módulo del proyecto menos `FatCatSignal` y `FatCatCore` (que son tablas)
@@ -181,7 +205,7 @@ Reglas, y todas tienen un test que las cubre:
 ```bash
 python3 tools/build_bundle.py --check   # el bundle coincide con sus fuentes
 python3 tools/lint_module_body.py       # ningún cuerpo lee una dependencia
-bash tools/test_fatchub_bundle.sh       # 100 asserts + la forma del árbol
+bash tools/test_fatchub_bundle.sh       # 137 asserts + la forma del árbol
 bash tools/test_fatchub_loader.sh       # 57 asserts del loader, con el bundle real
 node tools/luau/analyze.mjs --quiet "src/project"
 ```

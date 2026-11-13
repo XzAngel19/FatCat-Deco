@@ -295,15 +295,31 @@ return function(Modules)
 		_G.FatCatProject = Core
 
 		-- 3. The rest of the core modules, in dependency order.
+		--
+		-- Which of these may fail without taking the menu down: everything
+		-- except the two the shell itself is built on. FatCatEnv supplies the
+		-- executor surface, FatCatSignal is already loaded, and the shell
+		-- needs nothing else to open. A broken palette (Design) or a broken
+		-- widget kit (Materials) degrades the look and the project tabs, but
+		-- the window the user opens with RightShift still comes up, which is
+		-- the whole point of a client that is supposed to stay usable.
+		local OPTIONAL = {
+			FatCatConfig = "presets and saved values",
+			FatCatDesign = "palettes and typography",
+			FatCatMaterials = "the project's widget kit",
+			FatCatMath = "trajectories and prediction",
+		}
 		for _, name in { "FatCatEnv", "FatCatConfig", "FatCatDesign", "FatCatMaterials", "FatCatMath" } do
 			Init.STAGE = name
 			local module, why = factory(name)
 			if module == nil then
-				if name == "FatCatMath" then
-					-- Math is used by two features, not by the core; a failure
-					-- here costs the trajectory tools, not the menu.
+				if OPTIONAL[name] then
+					-- Recorded, logged, and surfaced in the report: degraded,
+					-- not silent. `why` already names the module and the
+					-- error, so the card is readable.
 					failures[name] = tostring(why)
-					Core:Log("warn", why)
+					Core:Log("warn", ("[Fat Cat] %s no cargó (%s); sigo sin ello"):format(name, OPTIONAL[name]))
+					Core:Log("warn", tostring(why))
 				else
 					return fail(name, why)
 				end
@@ -369,15 +385,30 @@ return function(Modules)
 
 		-- 6. The menu. This is the first step that draws anything, so every
 		--    prior failure is visible in the log before the window exists.
+		--
+		-- Two chances, because they fail for different reasons: the first
+		-- build uses the project's palette and widget kit, the second drops
+		-- to the shell's own theme. If the project layer is what broke, the
+		-- menu still opens instead of showing an error card over a black
+		-- screen.
 		Init.STAGE = "FatCatMenu"
 		local menu, menuWhy = Core:TryRequire("FatCatMenu")
 		if not menu then
 			return fail("FatCatMenu", menuWhy)
 		end
 
-		local built, buildWhy = menu.build()
-		if not built then
-			return fail("FatCatMenu.build", buildWhy)
+		-- build() reports (false, why) instead of throwing, so both shapes are
+		-- handled: a throw and a refusal are the same thing to the user.
+		local called, built, buildWhy = pcall(menu.build)
+		if not called or not built then
+			local reason = called and buildWhy or built
+			Core:Log("warn", "[Fat Cat] la primera construcción del menú falló, reintento sin tema")
+			Core:Log("warn", tostring(reason))
+			failures.FatCatMenu = tostring(reason)
+			local retried, retryBuilt, retryWhy = pcall(menu.build, { plain = true })
+			if not retried or not retryBuilt then
+				return fail("FatCatMenu.build", retried and retryWhy or retryBuilt)
+			end
 		end
 
 		-- 7. Unload hook and a final report.

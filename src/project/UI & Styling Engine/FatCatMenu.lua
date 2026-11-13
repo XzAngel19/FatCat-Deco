@@ -303,12 +303,18 @@ end
 -- Build
 -- ==========================================================================
 
-function Menu.build()
+---Build the menu over the shell.
+---`options.plain` is the fallback the bootstrapper retries with when the first
+---build throws: it keeps the shell, Home and Settings, and skips the module
+---tabs, because a module is the likeliest thing to be broken and the least
+---essential to opening the window at all.
+function Menu.build(options)
+	options = options or {}
 	local base = shell()
 	if not base then
 		return false, "el shell Fat Cat no está cargado"
 	end
-	if built then
+	if built and not options.plain then
 		base:EnsureBuilt()
 		return true
 	end
@@ -323,9 +329,12 @@ function Menu.build()
 	base._initOptions = base._initOptions or {}
 	base._initOptions.Tabs = { Menu.TABS[1][1] }
 
-	base:Mount(function(_activeHub, window)
+	local mounted, mountError = pcall(base.Mount, base, function(_activeHub, window)
 		buildHome(window)
 		buildSettings(window)
+		if options.plain then
+			return
+		end
 		for _, entry in Menu.TABS do
 			local name, modulePath = entry[1], entry[2]
 			if modulePath then
@@ -337,11 +346,19 @@ function Menu.build()
 				end
 			end
 		end
-		-- Adding a tab selects it, so the last one added would otherwise be
-		-- what the user sees first. Home is the intended landing page.
-		window:SelectTab("Home")
 	end)
 
+	if not mounted then
+		-- Leave the flag down so the retry can actually rebuild.
+		built = false
+		return false, tostring(mountError)
+	end
+
+	-- Adding a tab selects it, so the last one added would otherwise be what
+	-- the user sees first. Home is the intended landing page.
+	if base._window and base._window.pages["Home"] then
+		base._window:SelectTab("Home")
+	end
 	return true
 end
 
