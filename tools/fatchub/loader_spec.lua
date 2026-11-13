@@ -1,15 +1,30 @@
 -- Assertions for src/FatCatHub.loader.lua. Every case is a response body the
 -- loader has to survive: an HTML error page, a truncated file, a file that is
--- not the library, a syntax error in the library, an HttpGet that throws, and
+-- not the bundle, a syntax error in the bundle, an HttpGet that throws, and
 -- the happy path.
+--
+-- The loader now downloads src/FatCatHub.bundle.lua (twenty-one modules plus
+-- the bootstrapper) instead of src/FatCatHub.lua. The mock's fake body still
+-- has to satisfy looksLikeSource, so the happy path carries the two markers
+-- the real bundle has in its header: "Fat Cat Project" and "FatCatInit".
+
+-- A body that satisfies the loader's two markers, then whatever the case adds.
+local function bundleBody(payload, lines)
+	local header = "-- Fat Cat Project 2.1.0 -- generated\n-- see FatCatInit\n"
+	-- 64 chars per line: the loader rejects a body under 2000 characters, so
+	-- 40 lines is the cheapest body that clears its "probably an error page"
+	-- check with room to spare.
+	local filler = string.rep("--" .. string.rep("x", 60) .. "\n", lines or 40)
+	return header .. filler .. (payload or "")
+end
 
 local cases = {
 	{ name = "html error page", body = "<!DOCTYPE html><body>404 not found</body>", expect = "fail" },
 	{ name = "truncated body", body = string.rep("-- filler\n", 10), expect = "fail" },
 	{ name = "wrong file", body = string.rep("local a = 1\n", 400), expect = "fail" },
-	{ name = "syntax error", body = string.rep("local broken = )(\n", 100) .. "_G.FatCatHub = 1\n", expect = "compile" },
+	{ name = "syntax error", body = bundleBody("local broken = )(\n"), expect = "compile" },
 	{ name = "HttpGet throws", body = nil, expect = "fail" },
-	{ name = "happy path", body = string.rep("local a = 1\n", 100) .. "_G.FatCatHub = 1\n", expect = "ok" },
+	{ name = "happy path", body = bundleBody(), expect = "ok" },
 }
 
 local passed, failed = 0, 0
@@ -34,7 +49,8 @@ for _, case in ipairs(cases) do
 	local log = table.concat(LOGS, "\n")
 
 	check(ok, case.name .. ": loader did not raise")
-	check(LAST_URL ~= nil and LAST_URL:find("FatCatHub.lua", 1, true) ~= nil, case.name .. ": fetched FatCatHub.lua")
+	check(LAST_URL ~= nil and LAST_URL:find("FatCatHub.bundle.lua", 1, true) ~= nil,
+		case.name .. ": fetched the bundle")
 	check(URLS[1]:find("/main/", 1, true) ~= nil, case.name .. ": tried main first")
 
 	if case.expect == "ok" or case.expect == "compile" then
@@ -43,7 +59,7 @@ for _, case in ipairs(cases) do
 		-- Nothing loaded, so the loader should have walked to the next branch.
 		local sawFallback = false
 		for _, url in ipairs(URLS) do
-			if url:find("arena/4918f801-fatcat-deco", 1, true) then
+			if url:find("arena/292e8b51-fatcat-deco", 1, true) then
 				sawFallback = true
 			end
 		end
@@ -78,8 +94,9 @@ check(#URLS == 4, "honoured _G.FatCatHubBranch: one branch, two URLs, two forms"
 check(URLS[1] ~= nil and URLS[1]:find("some/other%-branch") ~= nil, "used the branch it was told to")
 _G.FatCatHubBranch = nil
 
--- Unload key is registered even when the download later fails.
-check(type(getgenv().FatCatHubUnload) == "function", "registered FatCatHubUnload")
+-- The unload key is registered before the download, so an executor that dies
+-- mid-fetch still leaves the user a working unload.
+check(type(getgenv().FatCatProjectUnload) == "function", "registered FatCatProjectUnload")
 
 REALPRINT(("PASS %d loader checks"):format(passed))
 if failed > 0 then

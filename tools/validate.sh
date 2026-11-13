@@ -92,10 +92,21 @@ echo "PASS release artifact: minified Cobalt still validates"
 # it compiles, the analyzer is clean (no baseline entry hides it), and the
 # mocked-DataModel harness passes.
 if [ -f src/FatCatHub.lua ]; then
+    # The bundle is generated, so it is checked against its sources before
+    # anything compiles it: a stale bundle is a build that ships the previous
+    # commit's code.
+    python3 tools/build_bundle.py --check || {
+        echo "tools/build_bundle.py mismatch" >&2
+        exit 1
+    }
     # The specs are compiled by their own harnesses, which wrap them correctly.
-    "$LUAU_COMPILE" src/FatCatHub.lua src/FatCatHub.loader.lua src/FatCatHub.project.lua >/dev/null
+    # The project modules are compiled too: the bundle concatenates them, so a
+    # file that only fails when assembled would slip through the analyzer.
+    "$LUAU_COMPILE" src/FatCatHub.lua src/FatCatHub.loader.lua src/FatCatHub.project.lua \
+        src/FatCatInit.lua src/project/*.lua >/dev/null
     node tools/luau/analyze.mjs --quiet src/FatCatHub.lua src/FatCatHub.loader.lua \
-        src/FatCatHub.project.lua >build/fatchub.analyze.txt 2>&1 || {
+        src/FatCatHub.project.lua src/FatCatInit.lua src/project/*.lua \
+        >build/fatchub.analyze.txt 2>&1 || {
         cat build/fatchub.analyze.txt
         exit 1
     }
@@ -109,6 +120,14 @@ if [ -f src/FatCatHub.lua ]; then
         exit 1
     }
     grep -E "^PASS" build/fatchub.loader.test.log
+    # The assembled bundle: boot, every module, the shell, teardown. This is the
+    # only gate that runs the real bootstrapper against a DataModel.
+    bash tools/test_fatchub_bundle.sh >build/fatchub.bundle.test.log 2>&1 || {
+        tail -30 build/fatchub.bundle.test.log
+        exit 1
+    }
+    bundle_checks="$(grep -c '^ok' build/fatchub.bundle.test.log)"
+    echo "PASS bundle harness: $bundle_checks checks"
 
     # Design gate: the rendered menu must not contain a hard error (a label
     # spilling out of its card, unreadable text). Warnings are reported in

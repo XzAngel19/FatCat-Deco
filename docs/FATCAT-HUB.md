@@ -7,12 +7,20 @@ toasts, config, minimizar, resize — y todo lo que era del juego se fue.
 Las pestañas están vacías a propósito: **el menú no registra ningún módulo**.
 
 ```
-src/FatCatHub.lua          el menú completo (shell + componentes + API)
-src/FatCatHub.project.lua  lo que el juego rellena (vacío por ahora)
-src/FatCatHub.loader.lua   loader de una línea
-tools/fatchub/             harness: mock de Roblox, asserts, render PNG
-docs/FATCAT-HUB.md         esto
+src/FatCatHub.lua           la ventana: shell, componentes, API
+src/FatCatInit.lua          el bootstrapper del proyecto
+src/FatCatHub.bundle.lua    generado por tools/build_bundle.py
+src/project/*.lua           los 20 módulos del proyecto
+src/FatCatHub.project.lua   las tres pestañas del decompiler sobre el shell
+src/FatCatHub.loader.lua    loader de una línea
+tools/fatchub/              harness: mock de Roblox, asserts, render PNG
+docs/FATCAT-HUB.md          esto
 ```
+
+`src/FatCatHub.lua` sigue siendo la ventana y la única parte que los 94 asserts
+y la auditoría de diseño miden. El proyecto (los 20 módulos) se monta encima
+vía `Hub:Mount`, así que las dos mitades comparten tabs, toasts, búsqueda y
+teardown en vez de duplicarlos.
 
 ## Loader
 
@@ -24,7 +32,7 @@ Ojo con la URL: **`main` todavía no tiene `src/`**, así que ese archivo solo
 existe en la rama de trabajo. Mientras no esté mergeado:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/3f9165cb-fatcat-deco/src/FatCatHub.loader.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/XzAngel19/FatCat-Deco/arena/292e8b51-fatcat-deco/src/FatCatHub.loader.lua"))()
 ```
 
 El loader, una vez que corre, resuelve el resto solo: prueba `main` primero y
@@ -36,14 +44,20 @@ _G.FatCatHubBranch = "mi/rama"
 loadstring(...)()
 ```
 
-Qué hace, en orden: baja `src/FatCatHub.lua`, lo compila (con la línea exacta y
-dos de contexto si hay error de sintaxis), lo ejecuta y devuelve `_G.FatCatHub`.
-Rechaza páginas HTML, cuerpos truncados y archivos que no son la librería antes
-de intentar compilar nada. Para cerrarlo:
+Qué hace, en orden: baja `src/FatCatHub.bundle.lua` (los 20 módulos del
+proyecto más el bootstrapper y el shell, ya concatenados), lo compila (con la
+línea exacta y dos de contexto si hay error de sintaxis), lo ejecuta —lo que
+corre `FatCatInit` y arma las 7 pestañas— y devuelve `_G.FatCatHub`. Rechaza
+páginas HTML, cuerpos truncados y archivos que no son el bundle antes de
+intentar compilar nada. Para cerrarlo:
 
 ```lua
-getgenv().FatCatHubUnload()
+getgenv().FatCatProjectUnload()
 ```
+
+El bundle se regenera con `python3 tools/build_bundle.py`; `tools/validate.sh`
+falla si `src/FatCatHub.bundle.lua` no coincide con sus fuentes, así que un
+cambio en un módulo sin regenerar no puede llegar a una rama.
 
 Diagnóstico etapa por etapa: `_G.FatCatHubVerbose = true`.
 
@@ -66,7 +80,19 @@ end)
 `Hub:Init()` construye la ventana y borra lo que hubiera dentro; `Hub:Mount()`
 añade sin tirar nada y **se vuelve a ejecutar** en cada rebuild, así que el
 contenido del juego sobrevive a un cambio de resolución o de pestañas.
-`Hub.deferBoot = true` antes de que cargue la librería retrasa la ventana.
+
+Dos formas de retrasar la ventana, y cuál usar:
+
+| Cómo | Cuándo sirve |
+| --- | --- |
+| `_G.FatCatDeferBoot = true` antes de correr el chunk | un loader que no puede tocar `Hub` todavía |
+| `Hub.deferBoot = true` | código que ya tiene el Hub en la mano |
+
+Con cualquiera de las dos, nada construye la ventana hasta el primer
+`Hub:Init()`/`Hub:Mount()`. El bundle usa la global: `FatCatInit` la levanta
+antes de ejecutar el shell y `FatCatMenu` nombra las 7 pestañas antes de
+montarlas, así que la ventana nace ya con la estructura final y nunca hay un
+`"Main"` vacío de por medio.
 
 ### Referencia de componentes
 
@@ -239,12 +265,20 @@ Para diagnosticar desde la consola: `_G.FatCatHub._lastKey` y
 
 ```bash
 bash tools/luau/setup.sh            # toolchain (una vez)
+python3 tools/build_bundle.py       # regenera src/FatCatHub.bundle.lua
 bash tools/test_fatchub.sh          # 94 asserts de librería + 16 del proyecto
 bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
+bash tools/test_fatchub_bundle.sh   # 100 asserts sobre el proyecto ensamblado
 bash tools/design.sh                # build/FatCatHub.png + auditoría
 bash tools/design.sh --project      # las pestañas del decompiler
 bash tools/validate.sh              # todo lo anterior + el resto del repo
 ```
+
+El arnés del bundle (100 asserts) es el único que corre el bootstrapper de verdad: arranca
+`FatCatInit`, comprueba que ningún módulo falló, que el shell publicó
+`_G.FatCatHub`, que hay exactamente 7 pestañas y ninguna vacía, que un preset
+llega al shell por su flag, y que `Core:Destroy()` deja el global en nil y no
+se puede volver a pedir un módulo después.
 
 `tools/fatchub/mock.lua` simula el DataModel: instancias, señales, tweens
 (inmediatos), `task` (manual, con `flush()`), `HttpService` con JSON real,
@@ -270,3 +304,73 @@ siguiente y que `_G.FatCatHubBranch` manda.
 
 Prueba que no se puede hacer acá: el menú en Roblox vivo. El VM es el Luau real,
 pero la fuente, los textos y el render final los pone el cliente.
+
+## El proyecto modular
+
+El menú de este documento es la **ventana**. Encima vive `src/project/`: veinte
+módulos que se cargan en un orden explícito y comparten un solo global
+(`_G.FatCatProject`), un solo ciclo de vida y un solo Unload.
+
+### Cómo se ensambla
+
+```
+src/project/*.lua + src/FatCatInit.lua + src/FatCatHub.lua
+        └── tools/build_bundle.py ──► src/FatCatHub.bundle.lua
+                                          └── el loader baja este archivo
+```
+
+Cada módulo va dentro de su propio `do ... end`, así que un `local Core` en uno
+no colisiona con el del siguiente; lo único que escapa es el valor guardado en
+la tabla `Modules`. `FatCatInit` recibe esa tabla y decide el orden:
+
+| Etapa | Módulos | Si falla |
+| --- | --- | --- |
+| 1 | `FatCatSignal` | fatal |
+| 2 | `FatCatCore` | fatal |
+| 3 | `FatCatEnv`, `FatCatConfig`, `FatCatDesign`, `FatCatMaterials`, `FatCatMath` | fatal, salvo Math (aviso) |
+| 4 | `FatCatHub` (el shell) | fatal |
+| 5 | el resto, bajo demanda | la pestaña dice por qué |
+
+Un fallo **no** deja una pantalla en blanco: `FatCatInit` dibuja una tarjeta con
+la etapa y las dos primeras líneas del error, deja `getgenv().FatCatProjectUnload`
+instalado, y el resto del menú sigue en pie. Una pestaña rota cuesta una
+pestaña.
+
+### Las siete pestañas
+
+La barra reparte `(ancho - 12) / n` por pestaña. A 460 px y 7 pestañas son 64 px
+cada una; el nombre más ancho del proyecto (`Settings`) mide 54 px a 13 px. Con
+8 pestañas el hueco baja a 56 px y empieza a apretar: la segunda herramienta va
+en una sección de la misma pestaña, no en una pestaña nueva.
+
+| Pestaña | Contenido |
+| --- | --- |
+| Home | estado del ejecutor, capacidades, paleta, atajo, Unload |
+| Create | creador visual de GUIs (documento → instancias) |
+| Inspect | jerarquía, propiedades, tablas con ciclos |
+| Scripts | decompiler del ejecutor + extractor de scripts |
+| Exploit | hooks de VM reversibles + configuración de proyectiles |
+| Network | remote spy (FireServer / OnClientEvent, ring de 200) |
+| Settings | presets JSON, sesión, recarga, Unload |
+
+### Presets
+
+Un preset es el `Hub.Values` del shell, filtrado a texto/número/booleano y
+escrito en `FatCatProject/presets/<nombre>.json`, con un `index.json` que
+guarda el orden y el activo. Los valores se aplican por `Hub.Setters`, uno por
+uno: un flag que ya no existe se omite en vez de abortar la carga.
+
+### Unload
+
+`getgenv().FatCatProjectUnload()` corre en este orden:
+
+1. para los bucles que el proyecto posee;
+2. destruye la ventana (el `ScreenGui` cuelga de `CoreGui`, así que se lleva
+   las siete pestañas);
+3. corre los teardowns de los módulos en orden inverso al de carga, cada uno en
+   `pcall`;
+4. suelta `_G.FatCatProject` **al final**, para que los teardowns del paso 3
+   todavía puedan encontrarlo.
+
+El paso 4 antes del 3 es el bug clásico de unload: el teardown lee un global
+nil y el error se pierde.

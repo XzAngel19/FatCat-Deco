@@ -199,6 +199,17 @@ local taskMock = {
 		return seconds or 0
 	end,
 	spawn = function(fn, ...)
+		-- Roblox's task.spawn accepts a function OR a suspended thread. A
+		-- signal that parks a coroutine in Wait() and resumes it with the
+		-- fired values needs the thread form, and a mock that only handles
+		-- functions turns "resume that thread" into "call a thread value".
+		if type(fn) == "thread" then
+			local ok, err = coroutine.resume(fn, ...)
+			if not ok then
+				print("  spawn error: " .. tostring(err))
+			end
+			return
+		end
 		local ok, err = pcall(fn, ...)
 		if not ok then
 			print("  spawn error: " .. tostring(err))
@@ -641,6 +652,9 @@ local localPlayer = Instance.new("Player")
 localPlayer.Name = "Tester"
 localPlayer.Parent = playerGui
 
+-- The projection fields are attached at the end of this file, once CFrame and
+-- Vector3 exist: FatCatMath.worldToScreen needs CFrame.PointToObjectSpace and
+-- a FieldOfView, and a camera without them silently reports "off screen".
 local camera = { ViewportSize = Vector2.new(1280, 720) }
 camera.GetPropertyChangedSignal = function()
 	return newSignal("ViewportSize", camera)
@@ -805,7 +819,175 @@ game = {
 	end,
 }
 
-workspace = { CurrentCamera = camera }
+-- workspace.Gravity is real (196.2 by default) and FatCatMath reads it. A nil
+-- there turns every trajectory call into "arithmetic on nil" three frames deep.
+workspace = { CurrentCamera = camera, Gravity = 196.2 }
 
 task = taskMock
 
+-- getgenv(): the executor environment. src/FatCatInit and src/FatCatHub.loader
+-- both call it unguarded (it exists on every executor), so the mock has to
+-- provide it or every boot path fails before the first line of Luau runs.
+-- Returns the global table itself, which is exactly what the harness wants: a
+-- value set there is visible to the next chunk in the same run.
+getgenv = function()
+	return _G
+end
+
+-- warn(): every executor has it, and both the loader and FatCatInit report
+-- failures through it. Without this the mock turns "report a error" into
+-- "attempt to call a nil value", which hides the error being reported.
+warn = function(...)
+	local parts = {}
+	for index = 1, select("#", ...) do
+		parts[index] = tostring((select(index, ...)))
+	end
+	print("WARN " .. table.concat(parts, " "))
+end
+
+
+-- ==========================================================================
+-- Datatypes the project modules use
+-- ==========================================================================
+-- The shell only ever needed Color3, UDim2 and Vector2, so this block landed
+-- with the project bundle rather than with the window. Everything here matches
+-- Roblox's arithmetic where the modules rely on it: Vector3 supports + - * /,
+-- Magnitude, Unit, Dot, Cross; CFrame supports * and PointToObjectSpace;
+-- Enum fills in on demand so a key nobody wrote yet still resolves.
+
+local VECTOR_META = {}
+VECTOR_META.__index = VECTOR_META
+VECTOR_META.__type = "Vector3"
+
+local function vector(x, y, z)
+	return setmetatable({ X = x or 0, Y = y or 0, Z = z or 0 }, VECTOR_META)
+end
+
+function VECTOR_META.__add(a, b)
+	return vector(a.X + b.X, a.Y + b.Y, a.Z + b.Z)
+end
+function VECTOR_META.__sub(a, b)
+	return vector(a.X - b.X, a.Y - b.Y, a.Z - b.Z)
+end
+function VECTOR_META.__mul(a, b)
+	if type(b) == "number" then
+		return vector(a.X * b, a.Y * b, a.Z * b)
+	end
+	if type(a) == "number" then
+		return vector(b.X * a, b.Y * a, b.Z * a)
+	end
+	return vector(a.X * b.X, a.Y * b.Y, a.Z * b.Z)
+end
+function VECTOR_META.__div(a, b)
+	if type(b) == "number" then
+		return vector(a.X / b, a.Y / b, a.Z / b)
+	end
+	return vector(a.X / b.X, a.Y / b.Y, a.Z / b.Z)
+end
+function VECTOR_META.__unm(a)
+	return vector(-a.X, -a.Y, -a.Z)
+end
+function VECTOR_META.__eq(a, b)
+	return a.X == b.X and a.Y == b.Y and a.Z == b.Z
+end
+function VECTOR_META.__tostring(a)
+	return ("%.3f, %.3f, %.3f"):format(a.X, a.Y, a.Z)
+end
+function VECTOR_META.Dot(a, b)
+	return a.X * b.X + a.Y * b.Y + a.Z * b.Z
+end
+function VECTOR_META.Cross(a, b)
+	return vector(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X)
+end
+VECTOR_META.__index = function(self, key)
+	if key == "Magnitude" then
+		return math.sqrt(self.X * self.X + self.Y * self.Y + self.Z * self.Z)
+	elseif key == "Unit" then
+		local magnitude = math.sqrt(self.X * self.X + self.Y * self.Y + self.Z * self.Z)
+		if magnitude == 0 then
+			return vector(0, 0, 0)
+		end
+		return vector(self.X / magnitude, self.Y / magnitude, self.Z / magnitude)
+	end
+	return VECTOR_META[key]
+end
+
+Vector3 = {
+	new = vector,
+	zero = vector(0, 0, 0),
+	one = vector(1, 1, 1),
+	xAxis = vector(1, 0, 0),
+	yAxis = vector(0, 1, 0),
+	zAxis = vector(0, 0, 1),
+}
+
+local CFrame = {}
+CFrame.__index = CFrame
+CFrame.__type = "CFrame"
+
+local function frame(position, look)
+	return setmetatable({ Position = position or Vector3.zero, _look = look or Vector3.new(0, 0, -1) }, CFrame)
+end
+
+CFrame.new = function(a, b)
+	if typeof(a) == "Vector3" then
+		return frame(a)
+	end
+	return frame(Vector3.new(a or 0, b or 0, 0))
+end
+CFrame.lookAt = function(from, to)
+	local look = (to - from).Unit
+	return frame(from, look)
+end
+CFrame.__mul = function(a, b)
+	if typeof(b) == "CFrame" then
+		return frame(a.Position + b.Position, a._look)
+	end
+	return a.Position + b
+end
+function CFrame:PointToObjectSpace(point)
+	return point - self.Position
+end
+function CFrame:PointToWorldSpace(point)
+	return point + self.Position
+end
+CFrame.LookVector = Vector3.new(0, 0, -1)
+CFrame.RightVector = Vector3.new(1, 0, 0)
+CFrame.UpVector = Vector3.new(0, 1, 0)
+CFrame.__index = function(self, key)
+	if key == "LookVector" then
+		return self._look or Vector3.new(0, 0, -1)
+	elseif key == "RightVector" then
+		return Vector3.new(1, 0, 0)
+	elseif key == "UpVector" then
+		return Vector3.new(0, 1, 0)
+	end
+	return CFrame[key]
+end
+
+_G.CFrame = CFrame
+Vector3 = Vector3
+
+-- typeof() has to name CFrame and Vector3 like Roblox does.
+local previousTypeof = typeof
+typeof = function(value)
+	if type(value) == "table" then
+		local meta = getmetatable(value)
+		if meta and meta.__type then
+			return meta.__type
+		end
+	end
+	return previousTypeof(value)
+end
+
+Vector2.new = function(x, y)
+	return setmetatable({ X = x or 0, Y = y or 0 }, { __sub = function(a, b)
+		return Vector2.new(a.X - b.X, a.Y - b.Y)
+	end })
+end
+
+-- The camera, now that the datatypes exist. Positioned at the origin looking
+-- down -Z with the engine's default field of view, which is what the math
+-- spec's assertions assume.
+camera.FieldOfView = 70
+camera.CFrame = CFrame.new(Vector3.zero)

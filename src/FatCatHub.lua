@@ -2115,7 +2115,10 @@ do
 			tabButtons = {},
 			tabUnderline = {},
 			tabIndexes = {},
-			tabNames = table.clone(CONFIG.tabs),
+			-- _initOptions, not CONFIG.tabs: a mounted project names its own
+			-- first tab before the window is built, and CONFIG.tabs was
+			-- captured when this chunk loaded.
+			tabNames = table.clone((Hub._initOptions and Hub._initOptions.Tabs) or CONFIG.tabs),
 			width = CONFIG.width,
 			height = CONFIG.height,
 			minimized = false,
@@ -2872,11 +2875,21 @@ do
 	end
 
 	---Build the window and run the tabs in CONFIG.tabs, then every builder.
-	---LazyBoot (the loader, or a project that wants to prepare first) can set
-	---Hub.deferBoot = true before the library finishes loading; the window is
-	---then only built by the first Hub:Init()/Hub:Mount().
-	if not Hub.deferBoot then
+	---LazyBoot: a loader that wants to prepare first sets either
+	---`_G.FatCatDeferBoot = true` (before running this chunk) or
+	---`Hub.deferBoot = true`; the window is then only built by the first
+	---Hub:Init()/Hub:Mount(). The global is checked here, at the point of use,
+	---because a loader cannot reach the Hub table until this chunk has run.
+	if not Hub.deferBoot and not _G.FatCatDeferBoot then
 		Hub.Init(Hub._initOptions)
+	else
+		-- A loader asked to prepare first. The project's own bootstrapper then
+		-- calls Hub.deferBoot = false before it mounts; the window is otherwise
+		-- only built by the first Init()/Mount(). `Booted` is set by the
+		-- generated bundle, so a bare shell download stays a shell and does not
+		-- pretend a project is coming.
+		Hub.pendingBoot = true
+		Hub.bootWhenReady = not _G.FatCatProject
 	end
 
 	-- No `return` here on purpose: a return inside a do-block at the top level
