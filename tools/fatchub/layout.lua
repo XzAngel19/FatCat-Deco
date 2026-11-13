@@ -137,6 +137,8 @@ local function measure(parent, rect, node)
 				end
 			end
 
+			local autoX = child.AutomaticSize == Enum.AutomaticSize.X
+				or child.AutomaticSize == Enum.AutomaticSize.XY
 			local childNode = {
 				instance = child,
 				rect = childRect,
@@ -144,7 +146,9 @@ local function measure(parent, rect, node)
 				corner = childOfClass(child, "UICorner"),
 				stroke = childOfClass(child, "UIStroke"),
 				gradient = childOfClass(child, "UIGradient"),
-				automatic = child.AutomaticSize == Enum.AutomaticSize.Y,
+				automatic = child.AutomaticSize == Enum.AutomaticSize.Y
+					or child.AutomaticSize == Enum.AutomaticSize.XY,
+				autoX = autoX,
 			}
 			table.insert(node.children, childNode)
 
@@ -152,6 +156,16 @@ local function measure(parent, rect, node)
 			-- its own height is known.
 			rects[child] = childRect
 			measure(child, childRect, childNode)
+
+			-- AutomaticSize.X: the object takes its content width. For a text
+			-- row that is TextBounds, which is what lets a code line run wider
+			-- than the panel and scroll instead of being cut with an ellipsis.
+			if autoX and (child.ClassName == "TextLabel" or child.ClassName == "TextButton") then
+				local bounds = child.TextBounds
+				if bounds then
+					childRect.w = math.max(childRect.w, bounds.X + 2)
+				end
+			end
 
 			if childNode.automatic then
 				local childPadding = childOfClass(child, "UIPadding")
@@ -228,6 +242,25 @@ local function flatten(node)
 			field("transparency", instance.BackgroundTransparency or 0)
 			field("radius", corner and corner.CornerRadius.Offset or 0)
 			field("gradient_alpha", gradientAlpha)
+			field("opacity", 1 - (instance.BackgroundTransparency or 0))
+			-- Ancestor group transparency is how whole panels fade in; without
+			-- it the audit reads a 2%-visible panel as a colour failure.
+			local inherited = 1
+			local ancestor = instance.Parent
+			while ancestor and ancestor ~= screen do
+				if ancestor.GroupTransparency then
+					inherited *= 1 - ancestor.GroupTransparency
+				end
+				ancestor = ancestor.Parent
+			end
+			field("group_alpha", inherited)
+			local z = instance.ZIndex or 1
+			local walk = instance.Parent
+			while walk and walk ~= screen and walk.ClassName ~= "ScreenGui" do
+				z += (walk.ZIndex or 1)
+				walk = walk.Parent
+			end
+			field("z", z)
 			table.insert(parts, string.format('"fill":[%s,%s,%s]', fill[1], fill[2], fill[3]))
 			if stroke then
 				local strokeColor = colorToTable(stroke.Color)
@@ -245,6 +278,37 @@ local function flatten(node)
 					alignment = alignment.Name or "Center"
 				end
 				field("align", alignment or "Center")
+				local valign = instance.TextYAlignment
+				if type(valign) == "table" then
+					valign = valign.Name or "Center"
+				end
+				field("valign", valign or "Center")
+				local fontName = "Gotham"
+				if type(instance.Font) == "table" then
+					fontName = instance.Font.Name or fontName
+				end
+				field("font", fontName)
+				if instance.TextWrapped then
+					table.insert(parts, '"wrap":1')
+				end
+				if instance.RichText then
+					table.insert(parts, '"rich":1')
+				end
+				if instance.ClassName == "TextBox" and (instance.Text == nil or instance.Text == "") then
+					table.insert(parts, '"placeholder":1')
+				end
+				-- Content anywhere inside a ScrollingFrame is clipped by the
+				-- viewport on purpose; it is reachable by scrolling, so the audit
+				-- must not call it truncated or clipped. Walk the ancestors: a
+				-- code row's direct parent is the frame itself only sometimes.
+				local scrollParent = instance.Parent
+				while scrollParent and scrollParent ~= screen do
+					if scrollParent.ClassName == "ScrollingFrame" then
+						table.insert(parts, '"scrolls":1')
+						break
+					end
+					scrollParent = scrollParent.Parent
+				end
 				table.insert(parts, string.format('"color":[%s,%s,%s]',
 					colorToTable(instance.TextColor3)[1], colorToTable(instance.TextColor3)[2],
 					colorToTable(instance.TextColor3)[3]))
@@ -255,10 +319,27 @@ local function flatten(node)
 			local parent = instance.Parent
 			while parent and parent ~= screen and #clips < 8 do
 				local rect = rects[parent]
-				if rect and (parent.ClipsDescendants or parent.ClassName == "ScrollingFrame") then
-					table.insert(clips, string.format("[%s,%s,%s,%s]",
-						math.floor(rect.x), math.floor(rect.y), math.floor(rect.w), math.floor(rect.h)))
+			if rect and (parent.ClipsDescendants or parent.ClassName == "ScrollingFrame") then
+				-- The stroke flag tells the renderer to inset the silhouette by
+				-- the border width; Roblox clips a UIStroke outside the frame.
+				local strokeHere = 0
+				for _, sibling in parent:GetChildren() do
+					if sibling.ClassName == "UIStroke" then
+						if sibling.ApplyStrokeMode == Enum.ApplyStrokeMode.Border then
+							strokeHere = 1
+						end
+						break
+					end
 				end
+				-- `scroll` tells the audit that going past this edge is
+				-- reachable by dragging, not lost. A ScrollingFrame clips, but
+				-- content inside it is not "cut off" in the design sense.
+				local scrolls = parent.ClassName == "ScrollingFrame" and 1 or 0
+				table.insert(clips, string.format(
+					'{"x":%s,"y":%s,"w":%s,"h":%s,"stroke":%s,"scroll":%s}',
+					math.floor(rect.x), math.floor(rect.y),
+					math.floor(rect.w), math.floor(rect.h), strokeHere, scrolls))
+			end
 				parent = parent.Parent
 			end
 			if #clips > 0 then

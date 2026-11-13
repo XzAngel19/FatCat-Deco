@@ -1,0 +1,9 @@
+{
+  "name": "truncated-label",
+  "why": "A label narrower than its text must be reported with the trimmed string.",
+  "expect": [{"rule": "text-truncated", "severity": "warning", "contains": "Apply Changes"}],
+  "nodes": [
+    {"class": "Frame", "name": "Window", "x": 100, "y": 100, "w": 300, "h": 120, "transparency": 0, "radius": 0, "fill": [0.1, 0.1, 0.12], "z": 1},
+    {"class": "TextButton", "name": "Apply", "x": 120, "y": 130, "w": 60, "h": 26, "transparency": 0, "radius": 5, "fill": [0.15, 0.15, 0.18], "z": 2, "text": "Apply Changes", "size": 12, "align": "Center", "valign": "Center", "font": "Gotham", "color": [0.94, 0.94, 0.95]}
+  ]
+}

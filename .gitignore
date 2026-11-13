@@ -6,3 +6,7 @@ tools/luau/bin/
 # Build and report output (validate.sh writes here).
 build/
 *.log
+
+# Python bytecode from the design tools.
+__pycache__/
+*.pyc

@@ -86,6 +86,7 @@ Enum = {
 	ZIndexBehavior = makeEnum("ZIndexBehavior", { "Sibling", "Global" }),
 	SortOrder = makeEnum("SortOrder", { "LayoutOrder", "Name" }),
 	AutomaticSize = makeEnum("AutomaticSize", { "None", "X", "Y", "XY" }),
+	AutomaticCanvasSize = makeEnum("AutomaticCanvasSize", { "None", "X", "Y", "XY" }),
 	TextXAlignment = makeEnum("TextXAlignment", { "Left", "Center", "Right" }),
 	TextYAlignment = makeEnum("TextYAlignment", { "Top", "Center", "Bottom" }),
 	TextTruncate = makeEnum("TextTruncate", { "None", "AtEnd" }),
@@ -474,13 +475,107 @@ function Instance.new(className)
 		return nil
 	end
 
+	---TextBounds: what Roblox reports after wrapping. The design harness needs
+	---it because components size themselves from it, and a mock that returns 0
+	---makes every wrapped label look one line tall.
+	---
+	---Real measurements come from _G.TextMetrics when tools/design.sh has packed
+	---the font tables in (see tools/fatchub/metrics.py). Without it the fallback
+	---is a per-character width estimate, which keeps test_fatchub.sh
+	---independent of whatever fonts the machine happens to have.
+	local function measureText(self)
+		local text = self.Text or ""
+		local size = self.TextSize or 14
+		local width = self.Size and self.Size.X.Offset or 0
+		local metrics = _G.TextMetrics
+		local function charWidth(char)
+			if metrics and metrics.advance then
+				local units = metrics.advance[char]
+				if units then
+					return units
+				end
+			end
+			-- Rough: narrow letters, wide letters, everything else.
+			if string.find("iIl.,:;'!|", char, 1, true) then
+				return 0.30
+			elseif string.find("mMW@%", char, 1, true) then
+				return 0.95
+			end
+			return 0.55
+		end
+
+		local function lineWidth(line)
+			local total = 0
+			for index = 1, #line do
+				total += charWidth(string.sub(line, index, index))
+			end
+			return total * size
+		end
+
+		local lines = 1
+		local widest = 0
+		-- A label sized in scale (1, -18) reports Offset 0 but its real width
+		-- comes from the parent. Without walking that up, every wrapped label
+		-- in the harness measures against 1px and claims one line.
+		if width <= 0 then
+			local ancestor = self.Parent
+			while ancestor and width <= 0 do
+				if ancestor.AbsoluteSize then
+					local parentWidth = ancestor.AbsoluteSize.X
+					if parentWidth and parentWidth > 0 then
+						width = parentWidth - 18
+					end
+				end
+				ancestor = ancestor.Parent
+			end
+		end
+		local available = math.max(1, width)
+		local line = ""
+		for word in string.gmatch(text, "[^ ]+") do
+			local candidate = line == "" and word or (line .. " " .. word)
+			if self.TextWrapped and lineWidth(candidate) > available and line ~= "" then
+				widest = math.max(widest, lineWidth(line))
+				lines += 1
+				line = word
+			else
+				line = candidate
+			end
+		end
+		widest = math.max(widest, lineWidth(line))
+		if self.TextWrapped then
+			widest = math.min(available, math.max(widest, 1))
+		end
+		-- Metrics carry the face's real ascent+descent when design.sh packed
+		-- them in; 1.16 em is the fallback, and the PNG uses the same line box.
+		local lineHeight = metrics and metrics.lineHeight or 1.16
+		return Vector2.new(widest, size * lineHeight * lines)
+	end
+
 	return setmetatable(instance, {
 		__index = function(self, key)
 			if key == "Parent" then
 				return self._parent
 			end
+			if key == "TextBounds" then
+				return measureText(self)
+			end
 			if key == "AbsoluteSize" then
-				return Vector2.new(self.Size and self.Size.X.Offset or 0, self.Size and self.Size.Y.Offset or 0)
+				-- Scale is resolved against the parent, one level up, so a label
+				-- sized `(1, -18)` reports the width it really has in game.
+				local w = self.Size and self.Size.X or nil
+				local h = self.Size and self.Size.Y or nil
+				local parentW, parentH = 0, 0
+				local parent = self._parent
+				if parent and parent.ClassName ~= "ScreenGui" then
+					local parentAbsolute = parent.AbsoluteSize
+					if parentAbsolute then
+						parentW, parentH = parentAbsolute.X, parentAbsolute.Y
+					end
+				end
+				return Vector2.new(
+					(w and ((w.Scale or 0) * parentW + (w.Offset or 0))) or 0,
+					(h and ((h.Scale or 0) * parentH + (h.Offset or 0))) or 0
+				)
 			end
 			if key == "AbsolutePosition" then
 				local x = self.Position and self.Position.X.Offset or 0

@@ -109,6 +109,26 @@ if [ -f src/FatCatHub.lua ]; then
         exit 1
     }
     grep -E "^PASS" build/fatchub.loader.test.log
+
+    # Design gate: the rendered menu must not contain a hard error (a label
+    # spilling out of its card, unreadable text). Warnings are reported in
+    # build/FatCatHub.audit.json and do not fail the gate; see
+    # docs/FATCAT-DESIGN.md for the thresholds and why they are what they are.
+    bash tools/design.sh >build/fatchub.design.log 2>&1 || {
+        tail -30 build/fatchub.design.log
+        exit 1
+    }
+    grep -E "^audit:|^design:" build/fatchub.design.log | head -3
+    python3 tools/fatchub/test_font.py >build/fatchub.font.log 2>&1 || {
+        tail -20 build/fatchub.font.log
+        exit 1
+    }
+    grep -E "^PASS" build/fatchub.font.log
+    python3 tools/fatchub/test_audit.py >build/fatchub.audit.log 2>&1 || {
+        tail -20 build/fatchub.audit.log
+        exit 1
+    }
+    grep -E "^PASS" build/fatchub.audit.log
 fi
 
 # --- toolchain self-test --------------------------------------------------

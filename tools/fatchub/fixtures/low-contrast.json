@@ -1,0 +1,9 @@
+{
+  "name": "low-contrast",
+  "why": "Dim text on a matching surface is unreadable and must fail the contrast rule.",
+  "expect": [{"rule": "contrast", "severity": "error", "contains": "Almost invisible"}],
+  "nodes": [
+    {"class": "Frame", "name": "Window", "x": 100, "y": 100, "w": 300, "h": 100, "transparency": 0, "radius": 0, "fill": [0.12, 0.12, 0.12], "z": 1},
+    {"class": "TextLabel", "name": "Ghost", "x": 120, "y": 130, "w": 200, "h": 20, "transparency": 1, "radius": 0, "fill": [1, 1, 1], "z": 2, "text": "Almost invisible", "size": 13, "align": "Left", "valign": "Center", "font": "Gotham", "color": [0.16, 0.16, 0.16]}
+  ]
+}

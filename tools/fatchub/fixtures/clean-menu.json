@@ -1,0 +1,10 @@
+{
+  "name": "clean-menu",
+  "why": "A well-built row reports nothing - this catches rules that fire on everything.",
+  "expect": [],
+  "nodes": [
+    {"class": "Frame", "name": "Window", "x": 100, "y": 100, "w": 320, "h": 140, "transparency": 0, "radius": 12, "fill": [0.09, 0.09, 0.11], "z": 1},
+    {"class": "TextButton", "name": "Silent Aim", "x": 116, "y": 120, "w": 288, "h": 32, "transparency": 0.06, "radius": 8, "fill": [0.15, 0.15, 0.17], "stroke": {"color": [0.41, 0.41, 0.45], "transparency": 0.66, "thickness": 1}, "z": 2, "text": "Silent Aim", "size": 13, "align": "Left", "valign": "Center", "font": "Gotham", "color": [0.94, 0.94, 0.95]},
+    {"class": "TextButton", "name": "Auto Reload", "x": 116, "y": 160, "w": 288, "h": 32, "transparency": 0.06, "radius": 8, "fill": [0.15, 0.15, 0.17], "stroke": {"color": [0.41, 0.41, 0.45], "transparency": 0.66, "thickness": 1}, "z": 2, "text": "Auto Reload", "size": 13, "align": "Left", "valign": "Center", "font": "Gotham", "color": [0.94, 0.94, 0.95]}
+  ]
+}

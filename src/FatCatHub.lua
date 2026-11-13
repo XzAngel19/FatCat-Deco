@@ -1247,9 +1247,11 @@ do
 			TextTruncate = Enum.TextTruncate.AtEnd,
 		}, card)
 
+		-- 26 px tall: a keybind is clicked constantly to rebind, and the design
+		-- audit flags pointer targets under 24 px.
 		local chip = create("TextButton", {
-			Size = UDim2.fromOffset(84, 22),
-			Position = UDim2.new(1, -95, 0.5, -11),
+			Size = UDim2.fromOffset(84, 26),
+			Position = UDim2.new(1, -95, 0.5, -13),
 			BackgroundColor3 = THEME.chip,
 			BorderSizePixel = 0,
 			Text = default ~= "" and tostring(default) or "None",
@@ -1536,12 +1538,16 @@ do
 	end
 
 	---Dimmed descriptive paragraph.
+	---Plain wrapped caption. The card grows with its text instead of being a
+	---fixed 34 px: a three-line notice used to clip its last line, which the
+	---design audit reports as text-overflow.
 	function Components.Label(parent, text)
 		local card = createCard(parent, tostring(text), 34, false)
 		card.BackgroundTransparency = 1
+		card.AutomaticSize = Enum.AutomaticSize.Y
 
-		create("TextLabel", {
-			Size = UDim2.new(1, -18, 1, -8),
+		local label = create("TextLabel", {
+			Size = UDim2.new(1, -18, 0, 0),
 			Position = UDim2.fromOffset(9, 4),
 			BackgroundTransparency = 1,
 			Text = tostring(text),
@@ -1551,7 +1557,24 @@ do
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
+			AutomaticSize = Enum.AutomaticSize.Y,
 		}, card)
+
+		-- The card gets the label's wrapped height. TextBounds is computed by
+		-- the engine from the label's own width, and a label that is still
+		-- auto-sizing reports what it has so far; a zero height here used to
+		-- collapse the whole card, taking the caption with it. One line of
+		-- 12 px text is the floor.
+		local bounds = label.TextBounds
+		-- Rounded up: TextBounds carries fractional pixels from the font
+		-- metrics, and a card 0.03px shorter than its caption reads as a clip
+		-- to the design audit (and to a picky eye at 2x).
+		local textHeight = math.ceil(math.max(bounds.Y, TEXT_SIZE.label))
+		card.Size = UDim2.new(1, 0, 0, textHeight + 8)
+		-- Explicit height: with AutomaticSize.Y *and* a fixed size, the
+		-- engine keeps the fixed height, which is what the harness measures.
+		label.AutomaticSize = Enum.AutomaticSize.None
+		label.Size = UDim2.new(1, -18, 0, textHeight)
 
 		return card
 	end
@@ -1639,8 +1662,12 @@ do
 			ScrollBarImageColor3 = THEME.outline,
 			ScrollBarImageTransparency = 0.4,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			ScrollingDirection = Enum.ScrollingDirection.Y,
+			-- A decompiled line is routinely wider than the panel, and
+			-- truncating source in a source viewer is the one thing a viewer
+			-- must not do. AutomaticCanvasSize grows the canvas with the rows;
+			-- the frame scrolls both ways so long lines stay reachable.
+			AutomaticCanvasSize = Enum.AutomaticSize.XY,
+			ScrollingDirection = Enum.ScrollingDirection.XY,
 		}, holder)
 
 		create("UIListLayout", {
@@ -1658,14 +1685,18 @@ do
 				end
 			end
 			local row = create("TextLabel", {
-				Size = UDim2.new(1, -8, 0, TEXT_SIZE.code + 4),
+				-- Width from the text, not from the panel: the row grows and the
+				-- scroll frame lets it run off to the right. Truncating a line of
+				-- source is the one thing a source viewer must not do.
+				Size = UDim2.new(0, 0, 0, TEXT_SIZE.code + 4),
+				AutomaticSize = Enum.AutomaticSize.X,
 				BackgroundTransparency = 1,
 				Text = ("%3d  %s"):format(index, text),
 				TextColor3 = color,
 				TextSize = TEXT_SIZE.code,
 				Font = FONT_MONO,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				TextTruncate = Enum.TextTruncate.AtEnd,
+				TextTruncate = Enum.TextTruncate.None,
 			}, scroll)
 			return row
 		end

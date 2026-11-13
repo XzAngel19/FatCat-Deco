@@ -10,9 +10,10 @@ menú **Fat Cat**.
 bash tools/luau/setup.sh --verify   # toolchain Luau desde los tarballs vendorizados
 bash tools/validate.sh              # puerta completa del toolchain
 bash tools/validate.sh --quick      # sin el type checker
-bash tools/test_fatchub.sh          # 82 + 16 asserts sobre el menú (Roblox simulado)
+bash tools/test_fatchub.sh          # 94 + 16 asserts sobre el menú (Roblox simulado)
 bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
-bash tools/render_fatchub.sh        # build/FatCatHub.png
+bash tools/design.sh                # render + auditoría: build/FatCatHub.png
+bash tools/design.sh --project      # las pestañas del decompiler
 ```
 
 Solo necesita `node` (v22) y `python3`. No hay `npm install` ni descargas: todo
@@ -46,6 +47,8 @@ Una vez cargado, el loader resuelve solo de qué rama bajar la librería (prueba
 | `tools/luau/bin/luau-minify <file> -o out` | DarkLua |
 | `tools/luau/bin/luau-disasm <file>` | prototipos, opcodes y constantes del bytecode |
 | `tools/luau/bin/luau-validate <file>` | integridad del contenedor `.luauc` |
+| `bash tools/design.sh` | volcado + PNG con texto real + auditoría de diseño |
+| `python3 tools/fatchub/audit.py build/layout.txt` | informe de recortes, contraste, targets |
 
 `bash tools/luau/setup.sh` recrea los binarios desde los tarballs.
 
@@ -58,5 +61,6 @@ node tools/luau/analyze.mjs --baseline            # 0 errores nuevos
 ## Documentación
 
 - [`docs/FATCAT-HUB.md`](docs/FATCAT-HUB.md) — el menú: API, componentes, bugs.
+- [`docs/FATCAT-DESIGN.md`](docs/FATCAT-DESIGN.md) — render con letras reales y auditoría de diseño.
 - [`docs/LUAU-TOOLCHAIN.md`](docs/LUAU-TOOLCHAIN.md) — qué se instaló y por qué.
 - `AGENTS.md` — guía de trabajo del repositorio.

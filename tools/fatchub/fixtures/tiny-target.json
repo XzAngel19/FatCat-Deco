@@ -1,0 +1,9 @@
+{
+  "name": "tiny-target",
+  "why": "A 12px close button is a mis-tap waiting to happen.",
+  "expect": [{"rule": "target-size", "severity": "warning", "contains": "Close"}],
+  "nodes": [
+    {"class": "Frame", "name": "Window", "x": 100, "y": 100, "w": 260, "h": 80, "transparency": 0, "radius": 0, "fill": [0.1, 0.1, 0.12], "z": 1},
+    {"class": "TextButton", "name": "Close", "x": 330, "y": 106, "w": 12, "h": 12, "transparency": 0, "radius": 3, "fill": [0.2, 0.2, 0.24], "z": 2, "text": "x", "size": 11, "align": "Center", "valign": "Center", "font": "Gotham", "color": [0.8, 0.8, 0.8]}
+  ]
+}

@@ -239,10 +239,10 @@ Para diagnosticar desde la consola: `_G.FatCatHub._lastKey` y
 
 ```bash
 bash tools/luau/setup.sh            # toolchain (una vez)
-bash tools/test_fatchub.sh          # 82 asserts de librería + 16 del proyecto
+bash tools/test_fatchub.sh          # 94 asserts de librería + 16 del proyecto
 bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
-bash tools/render_fatchub.sh        # build/FatCatHub.png
-PROJECT=1 bash tools/render_fatchub.sh build/FatCatHub-project.png
+bash tools/design.sh                # build/FatCatHub.png + auditoría
+bash tools/design.sh --project      # las pestañas del decompiler
 bash tools/validate.sh              # todo lo anterior + el resto del repo
 ```
 
@@ -254,9 +254,13 @@ vez, el buscador, save/load/reset, cambio de pestaña y que `Destroy` desconecta
 todo.
 
 `tools/fatchub/layout.lua` mide el árbol construido (AnchorPoint, escala,
-`UIListLayout`, `UIPadding`, `AutomaticSize`) y `tools/fatchub/render.py` lo
-dibuja a PNG en stdlib puro. El texto sale como barra proporcional: el render
-prueba geometría, apilado, color y recorte, **no** las letras.
+`UIListLayout`, `UIPadding`, `AutomaticSize`, cadenas de recorte y `ZIndex`) y
+`tools/fatchub/render.py` lo dibuja a PNG con **letras reales**, en stdlib
+puro. `tools/fatchub/audit.py` revisa el mismo volcado contra reglas de diseño
+(texto cortado, contraste, blancos táctiles, ritmo de espaciado) y
+`tools/fatchub/fixtures/` prueba cada regla con un menú roto a propósito.
+
+Detalle completo en [`FATCAT-DESIGN.md`](FATCAT-DESIGN.md).
 
 El harness del loader no usa red: simula `game:HttpGet`, `loadstring`, `getgenv`,
 `print` y `warn`, y le pasa como respuesta una página HTML, un cuerpo truncado,
