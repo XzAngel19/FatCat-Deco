@@ -163,8 +163,13 @@ Reglas, y todas tienen un test que las cubre:
 ```bash
 python3 tools/build_bundle.py --check   # el bundle coincide con sus fuentes
 bash tools/test_fatchub_bundle.sh       # 100 asserts sobre el proyecto ensamblado
+bash tools/test_fatchub_loader.sh       # 57 asserts del loader, con el bundle real
 node tools/luau/analyze.mjs --quiet src/FatCatInit.lua src/project/*.lua
 ```
+
+El arnés del loader no prueba un cuerpo inventado: `tools/test_fatchub_loader.sh`
+incrusta `src/FatCatHub.bundle.lua` tal como está en disco y se lo sirve al
+loader, así que un bundle que ya no cargue falla ahí y no en el ejecutor.
 
 El arnés del bundle arranca `FatCatInit` contra el DataModel simulado y
 comprueba, entre otras cosas: que ningún módulo falló, que el shell publicó

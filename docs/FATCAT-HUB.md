@@ -267,7 +267,7 @@ Para diagnosticar desde la consola: `_G.FatCatHub._lastKey` y
 bash tools/luau/setup.sh            # toolchain (una vez)
 python3 tools/build_bundle.py       # regenera src/FatCatHub.bundle.lua
 bash tools/test_fatchub.sh          # 94 asserts de librería + 16 del proyecto
-bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
+bash tools/test_fatchub_loader.sh   # 57 asserts del loader, sin red
 bash tools/test_fatchub_bundle.sh   # 100 asserts sobre el proyecto ensamblado
 bash tools/design.sh                # build/FatCatHub.png + auditoría
 bash tools/design.sh --project      # las pestañas del decompiler

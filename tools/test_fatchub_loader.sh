@@ -34,6 +34,24 @@ out=build/test_fatchub_loader.lua
     echo
     echo "end"
     echo
+    # The shipping bundle itself, inlined so the spec can feed it to the loader
+    # without a network call. Long-string delimiters are chosen so they cannot
+    # appear inside the bundle.
+    python3 - <<'PYGEN'
+import pathlib
+body = pathlib.Path("src/FatCatHub.bundle.lua").read_text()
+level = 1
+while ("]" + "=" * level + "]") in body:
+    level += 1
+eq = "=" * level
+lines = [
+    "-- ======== src/FatCatHub.bundle.lua, verbatim ========",
+    "REAL_BUNDLE = [%s[\n%s]%s]" % (eq, body, eq),
+    "",
+]
+print("\n".join(lines), end="")
+PYGEN
+    echo
     cat tools/fatchub/loader_spec.lua
 } > "$out"
 

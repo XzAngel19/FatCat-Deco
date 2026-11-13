@@ -84,6 +84,36 @@ for _, case in ipairs(cases) do
 	end
 end
 
+-- The real bundle, byte for byte, has to survive the same path: markers,
+-- size check, compile, and execution. A body built to satisfy the checks can
+-- drift from the artifact that actually ships, and this is the case that
+-- notices. REAL_BUNDLE is filled in by tools/test_fatchub_loader.sh.
+if REAL_BUNDLE and #REAL_BUNDLE > 0 then
+	BODY = REAL_BUNDLE
+	URLS = {}
+	LOGS = {}
+	FETCH_COUNT = 0
+	_G.FatCatHub = nil
+	for key in pairs(_G) do
+		if key == "FatCatProject" then
+			_G.FatCatProject = nil
+		end
+	end
+
+	local ok, returned = pcall(runLoader)
+	local log = table.concat(LOGS, "\n")
+
+	check(ok, "real bundle: loader did not raise")
+	check(FETCH_COUNT == 1, "real bundle: one fetch was enough")
+	check(returned ~= nil and type(returned) == "table", "real bundle: returned the hub")
+	check(_G.FatCatHub ~= nil, "real bundle: published _G.FatCatHub")
+	check(log:find("ready", 1, true) ~= nil, "real bundle: announced readiness")
+	if _G.FatCatHub then
+		check(type(_G.FatCatHub.Destroy) == "function", "real bundle: hub is usable")
+		_G.FatCatHub = nil
+	end
+end
+
 -- An explicit branch overrides the list.
 BODY = nil
 URLS = {}

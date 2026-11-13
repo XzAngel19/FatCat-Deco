@@ -11,7 +11,7 @@ bash tools/luau/setup.sh --verify   # toolchain Luau desde los tarballs vendoriz
 bash tools/validate.sh              # puerta completa del toolchain
 bash tools/validate.sh --quick      # sin el type checker
 bash tools/test_fatchub.sh          # 94 + 16 asserts sobre el menú (Roblox simulado)
-bash tools/test_fatchub_loader.sh   # 51 asserts del loader, sin red
+bash tools/test_fatchub_loader.sh   # 57 asserts del loader, sin red
 bash tools/test_fatchub_bundle.sh   # 100 asserts sobre el proyecto ensamblado
 python3 tools/build_bundle.py       # regenera src/FatCatHub.bundle.lua
 bash tools/design.sh                # render + auditoría: build/FatCatHub.png
