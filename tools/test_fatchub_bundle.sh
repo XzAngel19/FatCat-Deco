@@ -29,6 +29,53 @@ python3 tools/build_bundle.py --check >/dev/null || {
     python3 tools/build_bundle.py >/dev/null
 }
 
+# The tree the user asked for: five folders, literal names, `&` and spaces
+# included. Checked here because this is the gate that runs on the assembled
+# project, and because a rename would otherwise only show up as a diff nobody
+# reads. The bundle does not care (it searches by module name), so nothing else
+# would fail.
+python3 - <<'CHECK'
+import sys
+from pathlib import Path
+
+EXPECTED = {
+    "Core & Initialization": {"FatCatSignal", "FatCatCore", "FatCatEnv", "FatCatConfig", "FatCatInit"},
+    "UI & Styling Engine": {"FatCatDesign", "FatCatMaterials", "FatCatMenu"},
+    "Creation & Inspection Tools": {"FatCatCreate", "FatCatInspect"},
+    "Advanced Analysis, Exploitation & Anti-Tamper": {
+        "FatCatExtractor", "FatCatDecompiler", "FatCatStealer", "FatCatSpy",
+        "FatCatProjectiles", "FatCatVMHook", "FatCatMemoryScanner", "FatCatEnvSpoofer",
+    },
+    "Utilities, Console & Math": {"FatCatMath", "FatCatUniversal", "FatCatConsole"},
+}
+
+root = Path("src/project")
+problems = []
+if not root.is_dir():
+    problems.append("src/project/ is missing")
+else:
+    on_disk = {path.name for path in root.iterdir() if path.is_dir()}
+    for folder in EXPECTED:
+        if folder not in on_disk:
+            problems.append(f"missing folder: {folder!r}")
+            continue
+        actual = {path.stem for path in (root / folder).glob("*.lua")}
+        for name in sorted(EXPECTED[folder] - actual):
+            problems.append(f"{name}.lua is not in {folder!r}")
+        for name in sorted(actual - EXPECTED[folder]):
+            problems.append(f"{name}.lua does not belong in {folder!r}")
+    # No stray modules at the flat level: the folders are the structure now.
+    loose = sorted(path.name for path in root.glob("*.lua"))
+    if loose:
+        problems.append("loose modules at src/project/: " + ", ".join(loose))
+
+if problems:
+    for problem in problems:
+        print("FAIL structure: " + problem)
+    sys.exit(1)
+print("PASS the five folders are where they should be")
+CHECK
+
 mkdir -p build
 out=build/test_fatchub_bundle.lua
 

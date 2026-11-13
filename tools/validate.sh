@@ -102,10 +102,20 @@ if [ -f src/FatCatHub.lua ]; then
     # The specs are compiled by their own harnesses, which wrap them correctly.
     # The project modules are compiled too: the bundle concatenates them, so a
     # file that only fails when assembled would slip through the analyzer.
+    # mapfile, not a glob: the folders carry `&` and spaces, so `src/project/*.lua`
+    # matches nothing and an unquoted expansion would split on the spaces.
+    project_files=()
+    while IFS= read -r -d '' file; do
+        project_files+=("$file")
+    done < <(find src/project -name '*.lua' -print0)
+    if [ "${#project_files[@]}" -eq 0 ]; then
+        echo "no project modules found under src/project" >&2
+        exit 1
+    fi
     "$LUAU_COMPILE" src/FatCatHub.lua src/FatCatHub.loader.lua src/FatCatHub.project.lua \
-        src/FatCatInit.lua src/project/*.lua >/dev/null
+        "${project_files[@]}" >/dev/null
     node tools/luau/analyze.mjs --quiet src/FatCatHub.lua src/FatCatHub.loader.lua \
-        src/FatCatHub.project.lua src/FatCatInit.lua src/project/*.lua \
+        src/FatCatHub.project.lua "${project_files[@]}" \
         >build/fatchub.analyze.txt 2>&1 || {
         cat build/fatchub.analyze.txt
         exit 1

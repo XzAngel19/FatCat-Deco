@@ -1,64 +1,82 @@
 # Fat Cat Project — estructura de módulos
 
-La estructura que pediste, con esos nombres de carpeta y esos veinte archivos.
+La estructura que pediste, con esos nombres de carpeta y esos veinte archivos*.
 Este documento es el mapa: qué hace cada módulo, qué recibe, qué devuelve, y
-por qué el árbol se ve así en disco.
+cómo se ensambla en un solo chunk.
+
+\* veintiuno con `FatCatInit`, que es el bootstrapper y no un módulo de
+servicio: vive en `Core & Initialization/` porque ahí es donde se busca.
 
 ## En disco
 
+Las cinco carpetas son literales, con el `&` y los espacios del nombre:
+
 ```
 src/project/
-├── FatCatSignal.lua            motor de eventos internos (pub/sub)
-├── FatCatCore.lua              estado global, servicios, ciclo de vida/Unload
-├── FatCatEnv.lua               el ejecutor: capacidades, identidad, Unload
-├── FatCatConfig.lua            presets en disco (JSON)
-├── FatCatDesign.lua            paletas, estilos, animaciones Tween
-├── FatCatMaterials.lua         botones, toggles, sliders, temas
-├── FatCatMenu.lua              contenedor principal y estructura visual
-├── FatCatCreate.lua            creador/editor visual de GUIs
-├── FatCatInspect.lua           inspector de instancias, propiedades, tablas
-├── FatCatExtractor.lua         extracción de scripts del cliente
-├── FatCatDecompiler.lua        front end del decompiler del ejecutor
-├── FatCatStealer.lua           assets ya presentes en el cliente
-├── FatCatSpy.lua               remote spy
-├── FatCatProjectiles.lua       proyectiles: config, predicción, trayectoria
-├── FatCatVMHook.lua            hooks de función y metamétodo
-├── FatCatMemoryScanner.lua     búsqueda en el grafo de objetos
-├── FatCatEnvSpoofer.lua        identidad reportada y sandbox
-├── FatCatUniversal.lua         ESP, Fly, Noclip, Fullbright, teleport
-├── FatCatMath.lua              vectores, W2S, predicción, trayectorias
-└── FatCatConsole.lua           terminal flotante de logs y depuración
+├── Core & Initialization/
+│   ├── FatCatSignal.lua        motor de eventos internos (pub/sub)
+│   ├── FatCatCore.lua          estado global, servicios, ciclo de vida/Unload
+│   ├── FatCatEnv.lua           el ejecutor: capacidades, identidad, Unload
+│   ├── FatCatConfig.lua        presets en disco (JSON)
+│   └── FatCatInit.lua          el bootstrapper: orden de carga, errores, Unload
+├── UI & Styling Engine/
+│   ├── FatCatDesign.lua        paletas, estilos, animaciones Tween
+│   ├── FatCatMaterials.lua     botones, toggles, sliders, temas
+│   └── FatCatMenu.lua          contenedor principal y estructura visual
+├── Creation & Inspection Tools/
+│   ├── FatCatCreate.lua        creador/editor visual de GUIs
+│   └── FatCatInspect.lua       inspector de instancias, propiedades, tablas
+├── Advanced Analysis, Exploitation & Anti-Tamper/
+│   ├── FatCatExtractor.lua     extracción de scripts del cliente
+│   ├── FatCatDecompiler.lua    front end del decompiler del ejecutor
+│   ├── FatCatStealer.lua       assets ya presentes en el cliente
+│   ├── FatCatSpy.lua           remote spy
+│   ├── FatCatProjectiles.lua   proyectiles: config, predicción, trayectoria
+│   ├── FatCatVMHook.lua        hooks de función y metamétodo
+│   ├── FatCatMemoryScanner.lua búsqueda en el grafo de objetos
+│   └── FatCatEnvSpoofer.lua    identidad reportada y sandbox
+└── Utilities, Console & Math/
+    ├── FatCatMath.lua          vectores, W2S, predicción, trayectorias
+    ├── FatCatUniversal.lua     ESP, Fly, Noclip, Fullbright, teleport
+    └── FatCatConsole.lua       terminal flotante de logs y depuración
 ```
 
 Y fuera de `src/project/`, porque no son módulos del árbol:
 
 ```
-src/FatCatInit.lua           el bootstrapper (orden de carga, errores, Unload)
 src/FatCatHub.lua            la ventana: shell, componentes, API
 src/FatCatHub.bundle.lua     generado: los 21 archivos en un chunk
+src/FatCatHub.loader.lua     el que descarga y arranca el bundle
 tools/build_bundle.py        el generador
 ```
 
-## Por qué las carpetas no están en disco
+## La carpeta es documentación, no despacho
 
-Tu árbol agrupa los módulos en cinco carpetas con `&` y espacios
-(`Core & Initialization/`, `UI & Styling Engine/`, …). En disco están todos
-planos a propósito:
+`require` toma nombres pelados (`Core:Require("FatCatSpy")`), nunca una ruta
+con carpeta ni una barra. Eso no es una limitación que haya que rodear: el
+bundle es plano y busca por nombre, así que la carpeta solo dice **de qué
+grupo es un archivo** y dónde editarlo.
+
+En consecuencia:
 
 - **El loader baja un archivo, no un árbol.** Un ejecutor de Roblox recibe una
   URL y un string; no puede pedir `src/project/UI & Styling Engine/FatCatMenu.lua`
-  en tiempo de ejecución. Todo lo que llegue al cliente tiene que estar dentro
-  del bundle, y el bundle los concatena en un orden fijo.
-- **Un `&` y un espacio en una ruta URL son una fuente de bugs** que no
-  aportan nada: `%26`, `%20`, y un `HttpGet` que en algunos ejecutores no
-  escapa. El nombre de carpeta no cambia el comportamiento del módulo.
-- **El agrupamiento sigue existiendo** — en este documento y en el encabezado
-  de cada archivo (`-- Fat Cat Project | Advanced Analysis/FatCatVictim`), que
-  es donde un lector lo busca.
+  en tiempo de ejecución. Todo lo que llega al cliente está dentro del bundle.
+- **Las rutas con `&` y espacios no van a una URL.** Por eso
+  `src/FatCatHub.bundle.lua` es la única ruta que se descarga; las carpetas
+  existen en el repositorio, donde un `git clone` las maneja bien.
+- **`tools/build_bundle.py` busca recursivamente** (`PROJECT.rglob`), así que
+  mover un módulo de carpeta no requiere tocar el generador. Sí requiere que
+  el nombre sea único: dos `FatCatMath.lua` en grupos distintos son un error de
+  build, no una precedencia silenciosa.
+- **El orden de carga no depende de la carpeta.** Está en `MODULES` dentro de
+  `tools/build_bundle.py` y en `FatCatInit`: primero señales, después el core,
+  después lo que necesita un core.
 
-Si quieres las carpetas también en disco, se pueden crear como enlaces o
-mover los archivos y ajustar `MODULES` en `tools/build_bundle.py`; el
-generador acepta rutas en subcarpetas (`PROJECT.rglob`). Dímelo y lo hago.
+El chequeo de estructura vive en `tools/test_fatchub_bundle.sh`: verifica que
+las cinco carpetas existan con el nombre literal, que cada módulo esté en la
+suya, y que no haya módulos sueltos en `src/project/`. Renombrar una carpeta
+rompe la puerta, no el producto.
 
 ## Los cinco grupos
 
@@ -164,7 +182,7 @@ Reglas, y todas tienen un test que las cubre:
 python3 tools/build_bundle.py --check   # el bundle coincide con sus fuentes
 bash tools/test_fatchub_bundle.sh       # 100 asserts sobre el proyecto ensamblado
 bash tools/test_fatchub_loader.sh       # 57 asserts del loader, con el bundle real
-node tools/luau/analyze.mjs --quiet src/FatCatInit.lua src/project/*.lua
+node tools/luau/analyze.mjs --quiet "src/project/Core & Initialization"/FatCatInit.lua
 ```
 
 El arnés del loader no prueba un cuerpo inventado: `tools/test_fatchub_loader.sh`

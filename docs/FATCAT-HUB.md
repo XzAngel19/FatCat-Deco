@@ -8,9 +8,15 @@ Las pestañas están vacías a propósito: **el menú no registra ningún módul
 
 ```
 src/FatCatHub.lua           la ventana: shell, componentes, API
-src/FatCatInit.lua          el bootstrapper del proyecto
 src/FatCatHub.bundle.lua    generado por tools/build_bundle.py
-src/project/*.lua           los 20 módulos del proyecto
+src/project/                los 20 módulos, en las cinco carpetas
+  Core & Initialization/            FatCatSignal, Core, Env, Config, Init
+  UI & Styling Engine/              FatCatDesign, Materials, Menu
+  Creation & Inspection Tools/      FatCatCreate, Inspect
+  Advanced Analysis, Exploitation & Anti-Tamper/
+                                    Extractor, Decompiler, Stealer, Spy,
+                                    Projectiles, VMHook, MemoryScanner, EnvSpoofer
+  Utilities, Console & Math/        FatCatMath, Universal, Console
 src/FatCatHub.project.lua   las tres pestañas del decompiler sobre el shell
 src/FatCatHub.loader.lua    loader de una línea
 tools/fatchub/              harness: mock de Roblox, asserts, render PNG
@@ -308,16 +314,20 @@ pero la fuente, los textos y el render final los pone el cliente.
 ## El proyecto modular
 
 El menú de este documento es la **ventana**. Encima vive `src/project/`: veinte
-módulos que se cargan en un orden explícito y comparten un solo global
-(`_G.FatCatProject`), un solo ciclo de vida y un solo Unload.
+módulos repartidos en cinco carpetas que se cargan en un orden explícito y
+comparten un solo global (`_G.FatCatProject`), un solo ciclo de vida y un solo
+Unload. La carpeta es documentación: `require` siempre toma el nombre pelado.
 
 ### Cómo se ensambla
 
 ```
-src/project/*.lua + src/FatCatInit.lua + src/FatCatHub.lua
+src/project/**/*.lua + src/FatCatInit.lua + src/FatCatHub.lua
         └── tools/build_bundle.py ──► src/FatCatHub.bundle.lua
                                           └── el loader baja este archivo
 ```
+
+El generador busca por nombre de forma recursiva, así que la carpeta de un
+módulo no cambia el bundle; solo su nombre tiene que ser único.
 
 Cada módulo va dentro de su propio `do ... end`, así que un `local Core` en uno
 no colisiona con el del siguiente; lo único que escapa es el valor guardado en

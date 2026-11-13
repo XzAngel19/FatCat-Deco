@@ -46,29 +46,36 @@ Los módulos viven en `src/project/` y cada uno es un archivo independiente que
 se puede leer solo. `tools/build_bundle.py` los concatena en un único chunk.
 
 ```
-src/FatCatInit.lua            arranque, orden de carga, control de errores
-src/FatCatHub.bundle.lua      generado: no editar
+src/FatCatHub.lua            la ventana: shell, componentes, API
+src/FatCatHub.bundle.lua     generado: no editar
+src/FatCatHub.loader.lua     descarga y arranca el bundle
 src/project/
-  FatCatSignal.lua            eventos internos (pub/sub)
-  FatCatCore.lua              estado global, servicios, Unload
-  FatCatEnv.lua               ejecutor: detección de capacidades, Unload
-  FatCatConfig.lua            presets en disco (JSON)
-  FatCatDesign.lua            paletas, tipografía, curvas de animación
-  FatCatMaterials.lua         botones, toggles, sliders, dropdowns, código
-  FatCatMenu.lua              las 7 pestañas sobre el shell
-  FatCatCreate.lua            creador/editor visual de GUIs
-  FatCatInspect.lua           jerarquías, propiedades, tablas
-  FatCatExtractor.lua         extracción de scripts (bytecode/decompilado)
-  FatCatDecompiler.lua        front end del decompiler del ejecutor
-  FatCatStealer.lua           assets ya presentes en el cliente
-  FatCatSpy.lua               remote spy (FireServer/OnClientEvent)
-  FatCatProjectiles.lua       config de proyectiles y trayectorias
-  FatCatVMHook.lua            hooks de función y metamétodo, reversibles
-  FatCatMemoryScanner.lua     búsqueda en el grafo de objetos (gc/instancias)
-  FatCatEnvSpoofer.lua        identidad de identifyexecutor, sandbox
-  FatCatUniversal.lua         ESP, fly, noclip, fullbright, teleport
-  FatCatMath.lua              vectores, W2S, predicción, trayectorias
-  FatCatConsole.lua           terminal flotante de logs + runner Luau
+  Core & Initialization/
+    FatCatSignal.lua         eventos internos (pub/sub)
+    FatCatCore.lua           estado global, servicios, Unload
+    FatCatEnv.lua            ejecutor: detección de capacidades, Unload
+    FatCatConfig.lua         presets en disco (JSON)
+    FatCatInit.lua           arranque, orden de carga, control de errores
+  UI & Styling Engine/
+    FatCatDesign.lua         paletas, tipografía, curvas de animación
+    FatCatMaterials.lua      botones, toggles, sliders, dropdowns, código
+    FatCatMenu.lua           las 7 pestañas sobre el shell
+  Creation & Inspection Tools/
+    FatCatCreate.lua         creador/editor visual de GUIs
+    FatCatInspect.lua        jerarquías, propiedades, tablas
+  Advanced Analysis, Exploitation & Anti-Tamper/
+    FatCatExtractor.lua      extracción de scripts (bytecode/decompilado)
+    FatCatDecompiler.lua     front end del decompiler del ejecutor
+    FatCatStealer.lua        assets ya presentes en el cliente
+    FatCatSpy.lua            remote spy (FireServer/OnClientEvent)
+    FatCatProjectiles.lua    config de proyectiles y trayectorias
+    FatCatVMHook.lua         hooks de función y metamétodo, reversibles
+    FatCatMemoryScanner.lua  búsqueda en el grafo de objetos (gc/instancias)
+    FatCatEnvSpoofer.lua     identidad de identifyexecutor, sandbox
+  Utilities, Console & Math/
+    FatCatMath.lua           vectores, W2S, predicción, trayectorias
+    FatCatUniversal.lua      ESP, fly, noclip, fullbright, teleport
+    FatCatConsole.lua        terminal flotante de logs y depuración
 ```
 
 La ventana sigue siendo `src/FatCatHub.lua`: es el shell que ya cubren los 94
